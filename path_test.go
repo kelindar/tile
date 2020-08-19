@@ -6,7 +6,6 @@ package tile
 import (
 	"strings"
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -111,8 +110,4 @@ func pointInPath(point Point, path []Point) bool {
 		}
 	}
 	return false
-}
-
-func TestSizeOfNode(t *testing.T) {
-	assert.Equal(t, 40, int(unsafe.Sizeof(node{})))
 }
