@@ -67,9 +67,10 @@ func mapFrom(height, width int, str string) *Map {
 		}
 
 		for x, cell := range row {
-			tile, _ := m.At(uint16(x), uint16(y))
 			if cell == 'x' {
-				tile.Flags = tile.Flags | Blocked
+				m.UpdateAt(uint16(x), uint16(y), Tile{
+					Flags: Blocked,
+				})
 			}
 		}
 
@@ -85,7 +86,7 @@ func plotPath(m *Map, path []Point) string {
 		out[i] = make([]byte, m.Width)
 	}
 
-	m.Each(func(l Point, tile *Tile) {
+	m.Each(func(l Point, tile Tile) {
 		switch {
 		case pointInPath(l, path):
 			out[l.Y][l.X] = '.'

@@ -20,7 +20,7 @@ func TestHeap(t *testing.T) {
 func TestNewHeap(t *testing.T) {
 	h := newHeap32()
 	for j := 0; j < 8; j++ {
-		h.Push(rand(j), 1)
+		h.Push(rand(j), uint32(j))
 	}
 
 	val, _ := h.Pop()

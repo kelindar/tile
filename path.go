@@ -42,7 +42,7 @@ func (m *Map) Path(from, to Point) ([]Point, int, bool) {
 		}
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, _ *Tile) {
+		m.Neighbors(current.X, current.Y, func(next Point, _ Tile) {
 			pNext := next.Integer()
 			newCost := edges[pCurr].Cost + 1 // cost(current, next)
 

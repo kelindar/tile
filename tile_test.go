@@ -18,7 +18,7 @@ func TestEach(t *testing.T) {
 	m := NewMap(9, 9)
 
 	var path []string
-	m.Each(func(p Point, tile *Tile) {
+	m.Each(func(p Point, tile Tile) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 81, len(path))
@@ -46,15 +46,15 @@ func TestNeighbors(t *testing.T) {
 
 	// Create a 9x9 map with labeled tiles
 	m := NewMap(9, 9)
-	m.Each(func(p Point, tile *Tile) {
-		label := []byte(p.String())
-		copy(tile.Data[:], label[:3])
+	m.Each(func(p Point, tile Tile) {
+		copy(tile.Data[:], p.String()[:3])
+		m.UpdateAt(p.X, p.Y, tile)
 	})
 
 	// Run all the tests
 	for _, tc := range tests {
 		var out []string
-		m.Neighbors(tc.x, tc.y, func(_ Point, tile *Tile) {
+		m.Neighbors(tc.x, tc.y, func(_ Point, tile Tile) {
 			out = append(out, string(tile.Data[:3]))
 		})
 		assert.Equal(t, tc.expect, out)
@@ -65,13 +65,13 @@ func TestAt(t *testing.T) {
 
 	// Create a 9x9 map with labeled tiles
 	m := NewMap(9, 9)
-	m.Each(func(p Point, tile *Tile) {
-		label := []byte(p.String())
-		copy(tile.Data[:], label[:3])
+	m.Each(func(p Point, tile Tile) {
+		copy(tile.Data[:], p.String()[:3])
+		m.UpdateAt(p.X, p.Y, tile)
 	})
 
 	// Make sure our At() and the position matches
-	m.Each(func(p Point, tile *Tile) {
+	m.Each(func(p Point, tile Tile) {
 		at, _ := m.At(p.X, p.Y)
 		assert.Equal(t, p.String(), string(at.Data[:3]))
 	})
@@ -88,7 +88,7 @@ func Benchmark_Map(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Each(func(_ Point, tile *Tile) {
+			m.Each(func(_ Point, tile Tile) {
 				d = tile.Data // Pull data out
 			})
 		}
@@ -98,7 +98,7 @@ func Benchmark_Map(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Neighbors(300, 300, func(_ Point, tile *Tile) {
+			m.Neighbors(300, 300, func(_ Point, tile Tile) {
 				d = tile.Data // Pull data out
 			})
 		}

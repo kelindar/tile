@@ -3,7 +3,7 @@
 
 package tile
 
-type rangeFn = func(Point, *Tile)
+type rangeFn = func(Point, Tile)
 
 // Map represents a 2D tile map. Internally, a map is composed of 3x3 pages.
 type Map struct {
@@ -42,12 +42,21 @@ func (m *Map) Each(fn rangeFn) {
 }
 
 // At returns the tile at a specified position
-func (m *Map) At(x, y uint16) (*Tile, bool) {
+func (m *Map) At(x, y uint16) (Tile, bool) {
 	if x < 0 || y < 0 || x >= m.Height || y >= m.Width {
-		return nil, false
+		return Tile{}, false
 	}
 
-	return m.pages[x/3][y/3].At(x, y), true
+	return m.pages[x/3][y/3].Get(x, y), true
+}
+
+// UpdateAt updates the tile at a specific coordinate
+func (m *Map) UpdateAt(x, y uint16, tile Tile) {
+	if x < 0 || y < 0 || x >= m.Height || y >= m.Width {
+		return
+	}
+
+	m.pages[x/3][y/3].Set(x, y, tile)
 }
 
 // Neighbors iterates over the direct neighbouring tiles
@@ -63,28 +72,28 @@ func (m *Map) Neighbors(x, y uint16, fn rangeFn) {
 
 	// Get the North
 	if y > 0 {
-		if tile := m.pages[nX][nY].At(x, y-1); !tile.IsBlocked() {
+		if tile := m.pages[nX][nY].Get(x, y-1); !tile.IsBlocked() {
 			fn(At(x, y-1), tile)
 		}
 	}
 
 	// Get the East
 	if eX < m.pageWidth {
-		if tile := m.pages[eX][eY].At(x+1, y); !tile.IsBlocked() {
+		if tile := m.pages[eX][eY].Get(x+1, y); !tile.IsBlocked() {
 			fn(At(x+1, y), tile)
 		}
 	}
 
 	// Get the South
 	if sY < m.pageHeight {
-		if tile := m.pages[sX][sY].At(x, y+1); !tile.IsBlocked() {
+		if tile := m.pages[sX][sY].Get(x, y+1); !tile.IsBlocked() {
 			fn(At(x, y+1), tile)
 		}
 	}
 
 	// Get the West
 	if x > 0 {
-		if tile := m.pages[wX][wY].At(x-1, y); !tile.IsBlocked() {
+		if tile := m.pages[wX][wY].Get(x-1, y); !tile.IsBlocked() {
 			fn(At(x-1, y), tile)
 		}
 	}
@@ -137,26 +146,25 @@ type page struct {
 	Flags uint16    // Page flags, 2 bytes
 }
 
-// At returns a pointer for a tile at a coordinate
-func (p *page) At(x, y uint16) *Tile {
-	x, y = x%3, y%3
-	return &p.Tiles[y*3+x]
+// Get gets a tile at a specific coordinate.
+func (p *page) Get(x, y uint16) Tile {
+	return p.Tiles[(y%3)*3+(x%3)]
 }
 
-// UpdateEach iterates over all of the tile pointers in the page.
+// Set updates the tile at a specific coordinate
+func (p *page) Set(x, y uint16, tile Tile) {
+	p.Tiles[(y%3)*3+(x%3)] = tile
+}
+
+// UpdateEach iterates over all of the tiles in the page.
 func (p *page) Each(x, y uint16, fn rangeFn) {
-	fn(At(x, y), &p.Tiles[0])     // NW
-	fn(At(x+1, y), &p.Tiles[1])   // N
-	fn(At(x+2, y), &p.Tiles[2])   // NE
-	fn(At(x, y+1), &p.Tiles[3])   // W
-	fn(At(x+1, y+1), &p.Tiles[4]) // C
-	fn(At(x+2, y+1), &p.Tiles[5]) // E
-	fn(At(x, y+2), &p.Tiles[6])   // SW
-	fn(At(x+1, y+2), &p.Tiles[7]) // S
-	fn(At(x+2, y+2), &p.Tiles[8]) // SE
-}
-
-// -----------------------------------------------------------------------------
-
-type observer struct {
+	fn(At(x, y), p.Tiles[0])     // NW
+	fn(At(x+1, y), p.Tiles[1])   // N
+	fn(At(x+2, y), p.Tiles[2])   // NE
+	fn(At(x, y+1), p.Tiles[3])   // W
+	fn(At(x+1, y+1), p.Tiles[4]) // C
+	fn(At(x+2, y+1), p.Tiles[5]) // E
+	fn(At(x, y+2), p.Tiles[6])   // SW
+	fn(At(x+1, y+2), p.Tiles[7]) // S
+	fn(At(x+2, y+2), p.Tiles[8]) // SE
 }
