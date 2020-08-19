@@ -5,9 +5,14 @@ package tile
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestPageSize(t *testing.T) {
+	assert.LessOrEqual(t, int(unsafe.Sizeof(page{})), 64)
+}
 
 func TestEach(t *testing.T) {
 	m := NewMap(9, 9)
@@ -72,10 +77,10 @@ func TestAt(t *testing.T) {
 	})
 }
 
-// Benchmark_Map/each-8         	     758	   1531656 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/neighbors-8    	85755938	        13.4 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/each-8         	     584	   2032527 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/neighbors-8    	79988268	        14.8 ns/op	       0 B/op	       0 allocs/op
 func Benchmark_Map(b *testing.B) {
-	var d [6]byte
+	var d [5]byte
 	defer assert.NotNil(b, d)
 	m := NewMap(900, 900)
 

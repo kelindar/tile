@@ -100,7 +100,7 @@ func (m *Map) Around(x, y, distance uint16, fn rangeFn) {
 // Tile represents a packed tile information, it must fit on 6 bytes.
 type Tile struct {
 	Flags         // The flags of the tile
-	Data  [6]byte // The data of the tile
+	Data  [5]byte // The data of the tile
 }
 
 // Flags represents a tile flags, used for pathfinding and such.
@@ -122,17 +122,19 @@ const (
 	// Object ?
 )
 
-func Set(b, flag Flags) Flags    { return b | flag }
-func Clear(b, flag Flags) Flags  { return b &^ flag }
-func Toggle(b, flag Flags) Flags { return b ^ flag }
-func Has(b, flag Flags) bool     { return b&flag != 0 }
+//func Set(b, flag Flags) Flags    { return b | flag }
+//func Clear(b, flag Flags) Flags  { return b &^ flag }
+//func Toggle(b, flag Flags) Flags { return b ^ flag }
+//func Has(b, flag Flags) bool     { return b&flag != 0 }
 
 // -----------------------------------------------------------------------------
 
 // page represents a 3x3 tile page each page should neatly fit on a cache
 // line and speed things up.
 type page struct {
-	Tiles [9]Tile // Tiles, 63 bytes
+	Subs  *observer // Page osbservers, 8 bytes
+	Tiles [9]Tile   // Page tiles, 54 bytes
+	Flags uint16    // Page flags, 2 bytes
 }
 
 // At returns a pointer for a tile at a coordinate
@@ -152,4 +154,9 @@ func (p *page) Each(x, y uint16, fn rangeFn) {
 	fn(At(x, y+2), &p.Tiles[6])   // SW
 	fn(At(x+1, y+2), &p.Tiles[7]) // S
 	fn(At(x+2, y+2), &p.Tiles[8]) // SE
+}
+
+// -----------------------------------------------------------------------------
+
+type observer struct {
 }

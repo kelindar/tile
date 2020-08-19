@@ -9,13 +9,16 @@ type edge struct {
 	Cost uint32
 }
 
+type pathFn = func(Point)
+
 // Path calculates a short path and the distance between the two locations
-func (m *Map) Path(from, to Point) (path []Point, distance int, found bool) {
+func (m *Map) Path(from, to Point) ([]Point, int, bool) {
 	frontier := newHeap32()
 	frontier.Push(from.Integer(), 0)
 
 	// Add the first edge
-	edges := make(map[uint32]edge, 8)
+	capacity := int(float32(from.ManhattanDistance(to)) * 1.5)
+	edges := make(map[uint32]edge, capacity)
 	edges[from.Integer()] = edge{
 		Point: from,
 		Cost:  0,
@@ -27,14 +30,15 @@ func (m *Map) Path(from, to Point) (path []Point, distance int, found bool) {
 
 		// We have a path to the goal
 		if current.Equal(to) {
-			p := []Point{}
+			dist := int(edges[current.Integer()].Cost)
+			path := make([]Point, 0, dist)
 			curr, _ := edges[current.Integer()]
 			for !curr.Point.Equal(from) {
-				p = append(p, curr.Point)
+				path = append(path, curr.Point)
 				curr = edges[curr.Point.Integer()]
 			}
 
-			return p, int(edges[current.Integer()].Cost), true
+			return path, dist, true
 		}
 
 		// Get all of the neighbors
@@ -54,5 +58,6 @@ func (m *Map) Path(from, to Point) (path []Point, distance int, found bool) {
 
 		})
 	}
-	return
+
+	return nil, 0, false
 }

@@ -39,6 +39,8 @@ xxxxxxxxx`, plotPath(map9x9, path))
 
 // Benchmark_Path/9x9-8         	  266665	      4438 ns/op	    2878 B/op	      36 allocs/op
 // Benchmark_Path/9x9-8         	  300206	      3854 ns/op	    1372 B/op	      13 allocs/op
+// Benchmark_Path/9x9-8         	  428864	      2737 ns/op	     750 B/op	       7 allocs/op
+// Benchmark_Path/9x9-8         	  428580	      2611 ns/op	     678 B/op	       4 allocs/op
 func Benchmark_Path(b *testing.B) {
 	var d [6]byte
 	defer assert.NotNil(b, d)
