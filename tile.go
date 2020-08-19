@@ -141,9 +141,9 @@ const (
 // page represents a 3x3 tile page each page should neatly fit on a cache
 // line and speed things up.
 type page struct {
-	Subs  *observer // Page osbservers, 8 bytes
-	Tiles [9]Tile   // Page tiles, 54 bytes
-	Flags uint16    // Page flags, 2 bytes
+	Event *signal // Page signals, 8 bytes
+	Tiles [9]Tile // Page tiles, 54 bytes
+	Flags uint16  // Page flags, 2 bytes
 }
 
 // Get gets a tile at a specific coordinate.

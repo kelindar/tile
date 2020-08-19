@@ -10,19 +10,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEvents(t *testing.T) {
-	ev := newObserver()
+func TestSignal(t *testing.T) {
+	ev := newSignal()
 	assert.NotNil(t, ev)
 
 	// Subscriber which does nothing
-	ev.Subscribe(func(_ Point, _ Tile) {})
+	var sub1 testObserver = func(p Point, _ Tile) {}
+	ev.Subscribe(&sub1)
 
 	// Counting subscriber
 	var count int
-	cancel := ev.Subscribe(func(p Point, _ Tile) {
+	var sub2 testObserver = func(p Point, _ Tile) {
 		count += int(p.X)
-	})
-	defer cancel()
+	}
+	ev.Subscribe(&sub2)
 
 	ev.Notify(At(1, 0), Tile{})
 	ev.Notify(At(2, 0), Tile{})
@@ -33,15 +34,21 @@ func TestEvents(t *testing.T) {
 	}
 
 	assert.Equal(t, 6, count)
-	cancel()
+	ev.Unsubscribe(&sub2)
 
 	ev.Notify(At(2, 0), Tile{})
 	assert.Equal(t, 6, count)
 }
 
-func TestObserverNil(t *testing.T) {
+func TestSignalNil(t *testing.T) {
 	assert.NotPanics(t, func() {
-		var ev *observer
+		var ev *signal
 		ev.Notify(At(1, 0), Tile{})
 	})
+}
+
+type testObserver rangeFn
+
+func (fn *testObserver) OnTileUpdate(point Point, tile Tile) {
+	(*fn)(point, tile)
 }
