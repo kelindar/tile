@@ -25,4 +25,7 @@ func TestPoint(t *testing.T) {
 	assert.Equal(t, "8,18", p.Subtract(p2).String())
 	assert.Equal(t, "20,40", p.Multiply(p2).String())
 	assert.Equal(t, "5,10", p.Divide(p2).String())
+	assert.True(t, p.Within(At(1, 1), At(10, 20)))
+	assert.False(t, p.WithinSize(At(10, 20)))
+	assert.True(t, p.WithinSize(At(20, 30)))
 }

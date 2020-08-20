@@ -11,28 +11,28 @@ import (
 )
 
 var map9x9 = mapFrom(9, 9, `
-xxxxxxxxx
-x___x___x
-x__xxx_xx
-x___xx_xx
-xxx_xx__x
-x_______x
-xxxxx_xxx
-x_______x
-xxxxxxxxx`)
+.........
+.   .   .
+.  ... ..
+.    . ..
+...  .  .
+.       .
+..... ...
+.       .
+.........`)
 
 func TestPath(t *testing.T) {
 	path, dist, found := map9x9.Path(At(1, 1), At(7, 7))
 	assert.Equal(t, `
-xxxxxxxxx
-x_._x___x
-x_.xxx_xx
-x_..xx_xx
-xxx.xx__x
-x__...__x
-xxxxx.xxx
-x____.._x
-xxxxxxxxx`, plotPath(map9x9, path))
+.........
+. x .   .
+. x... ..
+. xxx. ..
+... x.  .
+.   xx  .
+.....x...
+.    xx .
+.........`, plotPath(map9x9, path))
 	assert.Equal(t, 12, dist)
 	assert.True(t, found)
 }
@@ -67,7 +67,7 @@ func mapFrom(height, width int, str string) *Map {
 		}
 
 		for x, cell := range row {
-			if cell == 'x' {
+			if cell == '.' {
 				m.UpdateAt(uint16(x), uint16(y), Tile{
 					Flags: Blocked,
 				})
@@ -81,19 +81,19 @@ func mapFrom(height, width int, str string) *Map {
 
 // plotPath plots the path on ASCII map
 func plotPath(m *Map, path []Point) string {
-	out := make([][]byte, m.Height)
+	out := make([][]byte, m.Size.Y)
 	for i := range out {
-		out[i] = make([]byte, m.Width)
+		out[i] = make([]byte, m.Size.X)
 	}
 
 	m.Each(func(l Point, tile Tile) {
 		switch {
 		case pointInPath(l, path):
-			out[l.Y][l.X] = '.'
-		case tile.Flags&Blocked != 0:
 			out[l.Y][l.X] = 'x'
+		case tile.Flags&Blocked != 0:
+			out[l.Y][l.X] = '.'
 		default:
-			out[l.Y][l.X] = '_'
+			out[l.Y][l.X] = ' '
 		}
 	})
 

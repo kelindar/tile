@@ -7,6 +7,44 @@ import (
 	"sync"
 )
 
+// View represents a view which can monitor a collection of tiles.
+type View struct {
+	world *Map  // The associated map
+	nw    Point // North-West point (top left)
+	se    Point // South-East point (bottom right)
+}
+
+// Resize resizes the viewport.
+func (v *View) Resize(nw, se Point) {
+
+}
+
+// MoveBy moves the viewport towards a particular direction.
+func (v *View) MoveBy(direction, by int) {
+
+}
+
+// MoveAt moves the viewport to a specific coordinate.
+func (v *View) MoveAt(nw Point) {
+
+}
+
+// OnTileUpdate occurs when a tile has updated.
+func (v *View) onTileUpdate(at Point, tile Tile) {
+
+}
+
+/*func (v *View) toLocal(x, y ) {
+  return {x: x - camera.x, y: y - camera.y};
+}
+
+
+function screenToWorld(x,y) {
+  return {x: x + camera.x, y: y + camera.y};
+}*/
+
+// -----------------------------------------------------------------------------
+
 // Observer represents a tile change observer.
 type Observer interface {
 	OnTileUpdate(Point, Tile)

@@ -67,6 +67,17 @@ func (p Point) DivideScalar(s uint16) Point {
 	return Point{p.X / s, p.Y / s}
 }
 
+// Within checks if the point is within the specified bounding box.
+func (p Point) Within(nw, se Point) bool {
+	return p.X >= nw.X && p.Y >= nw.Y && p.X <= se.X && p.Y <= se.Y
+}
+
+// WithinSize checks if the point is within the specified bounding box
+// which starts at 0,0 until the width/height provided.
+func (p Point) WithinSize(size Point) bool {
+	return p.X >= 0 && p.Y >= 0 && p.X < size.X && p.Y < size.Y
+}
+
 // ManhattanDistance calculates manhattan distance to the other point
 func (p Point) ManhattanDistance(other Point) uint32 {
 	return abs(int32(p.X)-int32(other.X)) + abs(int32(p.Y)-int32(other.Y))

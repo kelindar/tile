@@ -7,11 +7,10 @@ type rangeFn = func(Point, Tile)
 
 // Map represents a 2D tile map. Internally, a map is composed of 3x3 pages.
 type Map struct {
-	Width      uint16   // The width of the map
-	Height     uint16   // The height of the map
+	pages      [][]page // The pages of the map
 	pageWidth  uint16   // The max page width
 	pageHeight uint16   // The max page height
-	pages      [][]page // The pages of the map
+	Size       Point    // The map size
 }
 
 // NewMap returns a new map of the specified size. The width and height must be both
@@ -25,10 +24,9 @@ func NewMap(width, height uint16) *Map {
 
 	return &Map{
 		pages:      pages,
-		Width:      width * 3,
-		Height:     height * 3,
 		pageWidth:  width,
 		pageHeight: height,
+		Size:       At(width*3, height*3),
 	}
 }
 
@@ -41,22 +39,38 @@ func (m *Map) Each(fn rangeFn) {
 	}
 }
 
-// At returns the tile at a specified position
-func (m *Map) At(x, y uint16) (Tile, bool) {
-	if x < 0 || y < 0 || x >= m.Height || y >= m.Width {
-		return Tile{}, false
+// Within selects the tiles within a specifid bounding box which is specified by
+// north-west and south-east coordinates.
+func (m *Map) Within(nw, se Point, fn rangeFn) {
+	if !se.WithinSize(m.Size) {
+		se = At(m.Size.X-1, m.Size.Y-1)
 	}
 
-	return m.pages[x/3][y/3].Get(x, y), true
+	for y := nw.Y / 3; y <= se.Y/3; y++ {
+		for x := nw.X / 3; x <= se.X/3; x++ {
+			m.pages[x][y].Each(x*3, uint16(y)*3, func(p Point, tile Tile) {
+				if p.Within(nw, se) {
+					fn(p, tile)
+				}
+			})
+		}
+	}
+}
+
+// At returns the tile at a specified position
+func (m *Map) At(x, y uint16) (Tile, bool) {
+	if x < m.Size.X && y < m.Size.Y {
+		return m.pages[x/3][y/3].Get(x, y), true
+	}
+
+	return Tile{}, false
 }
 
 // UpdateAt updates the tile at a specific coordinate
 func (m *Map) UpdateAt(x, y uint16, tile Tile) {
-	if x < 0 || y < 0 || x >= m.Height || y >= m.Width {
-		return
+	if x < m.Size.X && y < m.Size.Y {
+		m.pages[x/3][y/3].Set(x, y, tile)
 	}
-
-	m.pages[x/3][y/3].Set(x, y, tile)
 }
 
 // Neighbors iterates over the direct neighbouring tiles
@@ -99,10 +113,10 @@ func (m *Map) Neighbors(x, y uint16, fn rangeFn) {
 	}
 }
 
-func (m *Map) Around(x, y, distance uint16, fn rangeFn) {
-	// BFS
-	// https://www.redblobgames.com/pathfinding/a-star/introduction.html
-}
+//func (m *Map) Around(x, y, distance uint16, fn rangeFn) {
+// BFS
+// https://www.redblobgames.com/pathfinding/a-star/introduction.html
+//}
 
 // -----------------------------------------------------------------------------
 
@@ -141,7 +155,7 @@ const (
 // page represents a 3x3 tile page each page should neatly fit on a cache
 // line and speed things up.
 type page struct {
-	Event *signal // Page signals, 8 bytes
+	event *signal // Page signals, 8 bytes
 	Tiles [9]Tile // Page tiles, 54 bytes
 	Flags uint16  // Page flags, 2 bytes
 }
@@ -154,6 +168,7 @@ func (p *page) Get(x, y uint16) Tile {
 // Set updates the tile at a specific coordinate
 func (p *page) Set(x, y uint16, tile Tile) {
 	p.Tiles[(y%3)*3+(x%3)] = tile
+	p.event.Notify(At(x, y), tile)
 }
 
 // UpdateEach iterates over all of the tiles in the page.
@@ -167,4 +182,22 @@ func (p *page) Each(x, y uint16, fn rangeFn) {
 	fn(At(x, y+2), p.Tiles[6])   // SW
 	fn(At(x+1, y+2), p.Tiles[7]) // S
 	fn(At(x+2, y+2), p.Tiles[8]) // SE
+}
+
+// Subscribe registers an event listener on a system
+func (p *page) Subscribe(sub Observer) {
+	if p.event == nil {
+		p.event = newSignal()
+	}
+
+	p.event.Subscribe(sub)
+}
+
+// Unsubscribe deregisters an event listener from a system
+func (p *page) Unsubscribe(sub Observer) {
+	if p.event == nil {
+		p.event = newSignal()
+	}
+
+	p.event.Unsubscribe(sub)
 }
