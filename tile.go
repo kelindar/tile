@@ -3,6 +3,11 @@
 
 package tile
 
+import (
+	"image"
+	"image/color"
+)
+
 // Iterator represents an iterator function.
 type Iterator = func(Point, Tile)
 type pageFn = func(int16, int16, *page)
@@ -125,17 +130,39 @@ func (m *Map) Neighbors(x, y int16, fn Iterator) {
 
 // View creates a new view of the map.
 func (m *Map) View(rect Rect) *View {
-	return &View{
+	view := &View{
 		Map:   m,
 		Inbox: make(chan Update, 8),
-		rect:  rect,
 	}
+
+	// Call the resize method
+	view.Resize(rect)
+	return view
 }
 
 //func (m *Map) Around(x, y, distance int16, fn Iterator) {
 // BFS
 // https://www.redblobgames.com/pathfinding/a-star/introduction.html
 //}
+
+// draw converts the map to a black and white image for debugging purposes.
+func (m *Map) draw(rect Rect) image.Image {
+	if rect.Max.X == 0 || rect.Max.Y == 0 {
+		rect = NewRect(0, 0, m.Size.X, m.Size.Y)
+	}
+
+	size := rect.Size()
+	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
+	m.Within(rect.Min, rect.Max, func(p Point, tile Tile) {
+		a := uint8(255)
+		if tile.Flags.IsBlocked() {
+			a = 0
+		}
+
+		output.SetRGBA(int(p.X), int(p.Y), color.RGBA{a, a, a, 255})
+	})
+	return output
+}
 
 // -----------------------------------------------------------------------------
 

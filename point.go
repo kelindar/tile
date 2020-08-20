@@ -119,3 +119,11 @@ func (r *Rect) Contains(p Point) bool {
 func (r *Rect) Intersects(box Rect) bool {
 	return !(box.Max.X < r.Min.X || box.Min.X > r.Max.X || box.Max.Y < r.Min.Y || box.Min.Y > r.Max.Y)
 }
+
+// Size returns the size of the rectangle
+func (r *Rect) Size() Point {
+	return Point{
+		X: r.Max.X - r.Min.X,
+		Y: r.Max.Y - r.Min.Y,
+	}
+}

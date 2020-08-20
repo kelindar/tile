@@ -4,25 +4,18 @@
 package tile
 
 import (
+	"image/color"
+	"image/png"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var map9x9 = mapFrom(9, 9, `
-.........
-.   .   .
-.  ... ..
-.    . ..
-...  .  .
-.       .
-..... ...
-.       .
-.........`)
-
 func TestPath(t *testing.T) {
-	path, dist, found := map9x9.Path(At(1, 1), At(7, 7))
+	m := mapFrom("9x9.png")
+	path, dist, found := m.Path(At(1, 1), At(7, 7))
 	assert.Equal(t, `
 .........
 . x .   .
@@ -32,24 +25,50 @@ func TestPath(t *testing.T) {
 .   xx  .
 .....x...
 .    xx .
-.........`, plotPath(map9x9, path))
+.........`, plotPath(m, path))
 	assert.Equal(t, 12, dist)
 	assert.True(t, found)
 }
 
-// Benchmark_Path/9x9-8         	  266665	      4438 ns/op	    2878 B/op	      36 allocs/op
-// Benchmark_Path/9x9-8         	  300206	      3854 ns/op	    1372 B/op	      13 allocs/op
-// Benchmark_Path/9x9-8         	  428864	      2737 ns/op	     750 B/op	       7 allocs/op
-// Benchmark_Path/9x9-8         	  428580	      2611 ns/op	     678 B/op	       4 allocs/op
-func Benchmark_Path(b *testing.B) {
-	var d [6]byte
-	defer assert.NotNil(b, d)
+/*func TestPath2(t *testing.T) {
+	m := mapFrom("300x300.png")
+	path, dist, found := m.Path(At(115, 20), At(160, 270))
+	assert.Equal(t, ``, plotPath(m, path))
+	ioutil.WriteFile("path.txt", []byte(plotPath(m, path)), os.ModePerm)
+	assert.Equal(t, 12, dist)
+	assert.True(t, found)
+}*/
 
+func TestDraw(t *testing.T) {
+	m := mapFrom("9x9.png")
+	out := m.draw(NewRect(0, 0, 0, 0))
+	assert.NotNil(t, out)
+	/*f, err := os.Create("image.png")
+	defer f.Close()
+
+	assert.NoError(t, err)
+	assert.NoError(t, png.Encode(f, out))
+	assert.NoError(t, f.Close())*/
+}
+
+// Benchmark_Path/9x9-8         	  342571	      3342 ns/op	     712 B/op	       4 allocs/op
+// Benchmark_Path/300x300-8     	     579	   2098446 ns/op	  532455 B/op	     255 allocs/op
+func Benchmark_Path(b *testing.B) {
 	b.Run("9x9", func(b *testing.B) {
+		m := mapFrom("9x9.png")
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			map9x9.Path(At(1, 1), At(7, 7))
+			m.Path(At(1, 1), At(7, 7))
+		}
+	})
+
+	b.Run("300x300", func(b *testing.B) {
+		m := mapFrom("300x300.png")
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(115, 20), At(160, 270))
 		}
 	})
 }
@@ -101,8 +120,36 @@ func rand(i int) uint32 {
 // -----------------------------------------------------------------------------
 
 // mapFrom creates a map from ASCII string
-func mapFrom(height, width int, str string) *Map {
-	m := NewMap(int16(height), int16(width))
+func mapFrom(name string) *Map {
+	f, err := os.Open("fixtures/" + name)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	// Decode the image
+	img, err := png.Decode(f)
+	if err != nil {
+		panic(err)
+	}
+
+	m := NewMap(int16(img.Bounds().Dx()), int16(img.Bounds().Dy()))
+	for y := int16(0); y < m.Size.Y; y++ {
+		for x := int16(0); x < m.Size.X; x++ {
+			//fmt.Printf("%+v %T\n", img.At(int(x), int(y)), img.At(int(x), int(y)))
+			v := img.At(int(x), int(y)).(color.RGBA)
+			switch v.R {
+			case 255:
+			case 0:
+				m.UpdateAt(x, y, Tile{
+					Flags: Blocked,
+				})
+			}
+		}
+	}
+	return m
+
+	/*m := NewMap(int16(height), int16(width))
 	var y int16
 	for _, row := range strings.Split(str, "\n") {
 		row = strings.TrimSpace(row)
@@ -120,7 +167,7 @@ func mapFrom(height, width int, str string) *Map {
 
 		y++
 	}
-	return m
+	return m*/
 }
 
 // plotPath plots the path on ASCII map

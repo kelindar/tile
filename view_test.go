@@ -15,13 +15,13 @@ func TestSignal(t *testing.T) {
 	assert.NotNil(t, ev)
 
 	// Subscriber which does nothing
-	var sub1 Iterator = func(p Point, _ Tile) {}
+	var sub1 fakeView = func(e *Update) {}
 	ev.Subscribe(&sub1)
 
 	// Counting subscriber
 	var count int
-	var sub2 Iterator = func(p Point, _ Tile) {
-		count += int(p.X)
+	var sub2 fakeView = func(e *Update) {
+		count += int(e.X)
 	}
 	ev.Subscribe(&sub2)
 
@@ -45,4 +45,10 @@ func TestSignalNil(t *testing.T) {
 		var ev *signal
 		ev.Notify(At(1, 0), Tile{})
 	})
+}
+
+type fakeView func(*Update)
+
+func (f fakeView) onUpdate(e *Update) {
+	f(e)
 }
