@@ -102,8 +102,8 @@ func rand(i int) uint32 {
 
 // mapFrom creates a map from ASCII string
 func mapFrom(height, width int, str string) *Map {
-	m := NewMap(uint16(height), uint16(width))
-	var y uint16
+	m := NewMap(int16(height), int16(width))
+	var y int16
 	for _, row := range strings.Split(str, "\n") {
 		row = strings.TrimSpace(row)
 		if len(row) != width {
@@ -112,7 +112,7 @@ func mapFrom(height, width int, str string) *Map {
 
 		for x, cell := range row {
 			if cell == '.' {
-				m.UpdateAt(uint16(x), uint16(y), Tile{
+				m.UpdateAt(int16(x), int16(y), Tile{
 					Flags: Blocked,
 				})
 			}

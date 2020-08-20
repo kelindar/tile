@@ -9,8 +9,6 @@ type edge struct {
 	Cost uint32
 }
 
-type pathFn = func(Point)
-
 // Path calculates a short path and the distance between the two locations
 func (m *Map) Path(from, to Point) ([]Point, int, bool) {
 	frontier := newHeap32()

@@ -113,7 +113,7 @@ func TestEach(t *testing.T) {
 
 func TestNeighbors(t *testing.T) {
 	tests := []struct {
-		x, y   uint16
+		x, y   int16
 		expect []string
 	}{
 		{x: 0, y: 0, expect: []string{"1,0", "0,1"}},

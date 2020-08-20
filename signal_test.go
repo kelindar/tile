@@ -47,7 +47,7 @@ func TestSignalNil(t *testing.T) {
 	})
 }
 
-type testObserver rangeFn
+type testObserver Iterator
 
 func (fn *testObserver) OnTileUpdate(point Point, tile Tile) {
 	(*fn)(point, tile)

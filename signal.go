@@ -9,39 +9,52 @@ import (
 
 // View represents a view which can monitor a collection of tiles.
 type View struct {
-	world *Map  // The associated map
-	nw    Point // North-West point (top left)
-	se    Point // South-East point (bottom right)
+	world *Map // The associated map
+	rect  Rect // The view box
 }
 
 // Resize resizes the viewport.
-func (v *View) Resize(nw, se Point) {
-
+func (v *View) Resize(box Rect) {
+	v.rect = box
 }
 
 // MoveBy moves the viewport towards a particular direction.
-func (v *View) MoveBy(direction, by int) {
-
+func (v *View) MoveBy(x, y int16) {
+	v.rect.Min = v.rect.Min.Add(At(x, y))
+	v.rect.Max = v.rect.Max.Add(At(x, y))
 }
 
 // MoveAt moves the viewport to a specific coordinate.
 func (v *View) MoveAt(nw Point) {
+	size := v.rect.Max.Subtract(v.rect.Min)
+	v.rect.Min = nw
+	v.rect.Max = nw.Add(size)
+}
 
+// Each iterates over all of the tiles in the view.
+func (v *View) Each(fn Iterator) {
+	v.world.Within(v.rect.Min, v.rect.Max, fn)
+}
+
+// At returns the tile at a specified position.
+func (v *View) At(x, y int16) (Tile, bool) {
+	return v.world.At(x, y)
+}
+
+// UpdateAt updates the tile at a specific coordinate.
+func (v *View) UpdateAt(x, y int16, tile Tile) {
+	v.world.UpdateAt(x, y, tile)
+}
+
+// Neighbors iterates over the direct neighbouring tiles.
+func (v *View) Neighbors(x, y int16, fn Iterator) {
+	v.world.Neighbors(x, y, fn)
 }
 
 // OnTileUpdate occurs when a tile has updated.
 func (v *View) onTileUpdate(at Point, tile Tile) {
 
 }
-
-/*func (v *View) toLocal(x, y ) {
-  return {x: x - camera.x, y: y - camera.y};
-}
-
-
-function screenToWorld(x,y) {
-  return {x: x + camera.x, y: y + camera.y};
-}*/
 
 // -----------------------------------------------------------------------------
 

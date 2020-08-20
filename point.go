@@ -7,18 +7,33 @@ import (
 	"fmt"
 )
 
+// Direction vectors
+/*var (
+	NorthWest = At(-1, -1)
+	North     = At(0, -1)
+	NorthEast = At(+1, -1)
+	West      = At(-1, 0)
+	Zero      = At(0, 0)
+	East      = At(+1, 0)
+	SouthWest = At(-1, +1)
+	South     = At(0, +1)
+	SouthEast = At(+1, +1)
+)*/
+
+// -----------------------------------------------------------------------------
+
 // Point represents a 2D coordinate.
 type Point struct {
-	X uint16 // X coordinate
-	Y uint16 // Y coordinate
+	X int16 // X coordinate
+	Y int16 // Y coordinate
 }
 
 func unpackPoint(v uint32) Point {
-	return At(uint16(v>>16), uint16(v))
+	return At(int16(v>>16), int16(v))
 }
 
 // At creates a new point at a specified x,y coordinate.
-func At(x, y uint16) Point {
+func At(x, y int16) Point {
 	return Point{X: x, Y: y}
 }
 
@@ -58,18 +73,23 @@ func (p Point) Divide(p2 Point) Point {
 }
 
 // MultiplyScalar multiplies the given point by the scalar.
-func (p Point) MultiplyScalar(s uint16) Point {
+func (p Point) MultiplyScalar(s int16) Point {
 	return Point{p.X * s, p.Y * s}
 }
 
 // DivideScalar divides the given point by the scalar.
-func (p Point) DivideScalar(s uint16) Point {
+func (p Point) DivideScalar(s int16) Point {
 	return Point{p.X / s, p.Y / s}
 }
 
 // Within checks if the point is within the specified bounding box.
 func (p Point) Within(nw, se Point) bool {
 	return p.X >= nw.X && p.Y >= nw.Y && p.X <= se.X && p.Y <= se.Y
+}
+
+// WithinRect checks if the point is within the specified bounding box.
+func (p Point) WithinRect(box Rect) bool {
+	return p.X >= box.Min.X && p.Y >= box.Min.Y && p.X <= box.Max.X && p.Y <= box.Max.Y
 }
 
 // WithinSize checks if the point is within the specified bounding box
@@ -88,4 +108,17 @@ func abs(n int32) uint32 {
 		return uint32(-n)
 	}
 	return uint32(n)
+}
+
+// -----------------------------------------------------------------------------
+
+// Rect represents a rectangle
+type Rect struct {
+	Min Point // Top left point of the rectangle
+	Max Point // Bottom right point of the rectangle
+}
+
+// NewRect creates a new rectangle
+func NewRect(left, top, bottom, right int16) Rect {
+	return Rect{Min: At(left, top), Max: At(bottom, right)}
 }

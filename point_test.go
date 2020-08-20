@@ -13,10 +13,10 @@ func TestPoint(t *testing.T) {
 	p := At(10, 20)
 	p2 := At(2, 2)
 
-	assert.Equal(t, uint16(10), p.X)
-	assert.Equal(t, uint16(20), p.Y)
+	assert.Equal(t, int16(10), p.X)
+	assert.Equal(t, int16(20), p.Y)
 	assert.Equal(t, uint32(0xa0014), p.Integer())
-	assert.Equal(t, p, unpackPoint(p.Integer()))
+	assert.Equal(t, At(-5, 5), unpackPoint(At(-5, 5).Integer()))
 	assert.Equal(t, "10,20", p.String())
 	assert.True(t, p.Equal(At(10, 20)))
 	assert.Equal(t, "20,40", p.MultiplyScalar(2).String())
@@ -26,6 +26,26 @@ func TestPoint(t *testing.T) {
 	assert.Equal(t, "20,40", p.Multiply(p2).String())
 	assert.Equal(t, "5,10", p.Divide(p2).String())
 	assert.True(t, p.Within(At(1, 1), At(10, 20)))
+	assert.True(t, p.WithinRect(NewRect(1, 1, 10, 20)))
 	assert.False(t, p.WithinSize(At(10, 20)))
 	assert.True(t, p.WithinSize(At(20, 30)))
+}
+
+func BenchmarkPoint(b *testing.B) {
+	p := At(10, 20)
+	b.Run("within", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			p.Within(At(0, 0), At(100, 100))
+		}
+	})
+
+	b.Run("within-rect", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			p.WithinRect(NewRect(0, 0, 100, 100))
+		}
+	})
 }

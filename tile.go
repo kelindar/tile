@@ -3,22 +3,23 @@
 
 package tile
 
-type rangeFn = func(Point, Tile)
+// Iterator represents an iterator function.
+type Iterator = func(Point, Tile)
 
 // Map represents a 2D tile map. Internally, a map is composed of 3x3 pages.
 type Map struct {
 	pages      [][]page // The pages of the map
-	pageWidth  uint16   // The max page width
-	pageHeight uint16   // The max page height
+	pageWidth  int16   // The max page width
+	pageHeight int16   // The max page height
 	Size       Point    // The map size
 }
 
 // NewMap returns a new map of the specified size. The width and height must be both
 // multiples of 3.
-func NewMap(width, height uint16) *Map {
+func NewMap(width, height int16) *Map {
 	width, height = width/3, height/3
 	pages := make([][]page, height)
-	for x := uint16(0); x < width; x++ {
+	for x := int16(0); x < width; x++ {
 		pages[x] = make([]page, height)
 	}
 
@@ -31,24 +32,24 @@ func NewMap(width, height uint16) *Map {
 }
 
 // Each iterates over all of the tiles in the map.
-func (m *Map) Each(fn rangeFn) {
-	for y := uint16(0); y < m.pageHeight; y++ {
-		for x := uint16(0); x < m.pageWidth; x++ {
-			m.pages[x][y].Each(x*3, uint16(y)*3, fn)
+func (m *Map) Each(fn Iterator) {
+	for y := int16(0); y < m.pageHeight; y++ {
+		for x := int16(0); x < m.pageWidth; x++ {
+			m.pages[x][y].Each(x*3, int16(y)*3, fn)
 		}
 	}
 }
 
 // Within selects the tiles within a specifid bounding box which is specified by
 // north-west and south-east coordinates.
-func (m *Map) Within(nw, se Point, fn rangeFn) {
+func (m *Map) Within(nw, se Point, fn Iterator) {
 	if !se.WithinSize(m.Size) {
 		se = At(m.Size.X-1, m.Size.Y-1)
 	}
 
 	for y := nw.Y / 3; y <= se.Y/3; y++ {
 		for x := nw.X / 3; x <= se.X/3; x++ {
-			m.pages[x][y].Each(x*3, uint16(y)*3, func(p Point, tile Tile) {
+			m.pages[x][y].Each(x*3, int16(y)*3, func(p Point, tile Tile) {
 				if p.Within(nw, se) {
 					fn(p, tile)
 				}
@@ -58,7 +59,7 @@ func (m *Map) Within(nw, se Point, fn rangeFn) {
 }
 
 // At returns the tile at a specified position
-func (m *Map) At(x, y uint16) (Tile, bool) {
+func (m *Map) At(x, y int16) (Tile, bool) {
 	if x < m.Size.X && y < m.Size.Y {
 		return m.pages[x/3][y/3].Get(x, y), true
 	}
@@ -67,14 +68,14 @@ func (m *Map) At(x, y uint16) (Tile, bool) {
 }
 
 // UpdateAt updates the tile at a specific coordinate
-func (m *Map) UpdateAt(x, y uint16, tile Tile) {
+func (m *Map) UpdateAt(x, y int16, tile Tile) {
 	if x < m.Size.X && y < m.Size.Y {
 		m.pages[x/3][y/3].Set(x, y, tile)
 	}
 }
 
 // Neighbors iterates over the direct neighbouring tiles
-func (m *Map) Neighbors(x, y uint16, fn rangeFn) {
+func (m *Map) Neighbors(x, y int16, fn Iterator) {
 
 	// First we need to figure out which pages contain the neighboring tiles and
 	// then load them. In the best-case we need to load only a single page. In
@@ -113,7 +114,7 @@ func (m *Map) Neighbors(x, y uint16, fn rangeFn) {
 	}
 }
 
-//func (m *Map) Around(x, y, distance uint16, fn rangeFn) {
+//func (m *Map) Around(x, y, distance int16, fn Iterator) {
 // BFS
 // https://www.redblobgames.com/pathfinding/a-star/introduction.html
 //}
@@ -161,18 +162,18 @@ type page struct {
 }
 
 // Get gets a tile at a specific coordinate.
-func (p *page) Get(x, y uint16) Tile {
+func (p *page) Get(x, y int16) Tile {
 	return p.Tiles[(y%3)*3+(x%3)]
 }
 
 // Set updates the tile at a specific coordinate
-func (p *page) Set(x, y uint16, tile Tile) {
+func (p *page) Set(x, y int16, tile Tile) {
 	p.Tiles[(y%3)*3+(x%3)] = tile
 	p.event.Notify(At(x, y), tile)
 }
 
 // UpdateEach iterates over all of the tiles in the page.
-func (p *page) Each(x, y uint16, fn rangeFn) {
+func (p *page) Each(x, y int16, fn Iterator) {
 	fn(At(x, y), p.Tiles[0])     // NW
 	fn(At(x+1, y), p.Tiles[1])   // N
 	fn(At(x+2, y), p.Tiles[2])   // NE
