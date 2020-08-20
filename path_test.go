@@ -54,6 +54,50 @@ func Benchmark_Path(b *testing.B) {
 	})
 }
 
+// BenchmarkHeap-8   	   94454	     12303 ns/op	    3968 B/op	       5 allocs/op
+func BenchmarkHeap(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		h := newHeap32()
+		for j := 0; j < 128; j++ {
+			h.Push(rand(j), 1)
+		}
+		for j := 0; j < 128*10; j++ {
+			h.Push(rand(j), 1)
+			h.Pop()
+		}
+	}
+}
+
+func TestHeap(t *testing.T) {
+	h := newHeap32()
+	h.Push(1, 0)
+	h.Pop()
+}
+
+func TestNewHeap(t *testing.T) {
+	h := newHeap32()
+	for j := 0; j < 8; j++ {
+		h.Push(rand(j), uint32(j))
+	}
+
+	val, _ := h.Pop()
+	for j := 1; j < 128; j++ {
+		newval, ok := h.Pop()
+		if ok {
+			assert.True(t, val < newval)
+			val = newval
+		}
+	}
+}
+
+// very fast semi-random function
+func rand(i int) uint32 {
+	i = i + 10000
+	i = i ^ (i << 16)
+	i = (i >> 5) ^ i
+	return uint32(i & 0xFF)
+}
+
 // -----------------------------------------------------------------------------
 
 // mapFrom creates a map from ASCII string
