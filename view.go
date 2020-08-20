@@ -21,16 +21,18 @@ type View struct {
 }
 
 // Resize resizes the viewport.
-func (v *View) Resize(box Rect) {
+func (v *View) Resize(box Rect, fn Iterator) {
 	prev := v.rect // Previous bounding box
 	v.rect = box   // New bounding box
 
 	// Unsubscribe from the pages which are not required anymore
-	v.Map.pagesWithin(prev.Min, prev.Max, func(x, y int16, page *page) {
-		if bounds := NewRect(x, y, x+3, y+3); !bounds.Intersects(box) {
-			page.Unsubscribe(v)
-		}
-	})
+	if prev.Min.X >= 0 || prev.Min.Y >= 0 || prev.Max.X >= 0 || prev.Max.Y >= 0 {
+		v.Map.pagesWithin(prev.Min, prev.Max, func(x, y int16, page *page) {
+			if bounds := NewRect(x, y, x+3, y+3); !bounds.Intersects(box) {
+				page.Unsubscribe(v)
+			}
+		})
+	}
 
 	// Subscribe to every page which we have not previously subscribed
 	v.Map.pagesWithin(box.Min, box.Max, func(x, y int16, page *page) {
@@ -38,30 +40,32 @@ func (v *View) Resize(box Rect) {
 			page.Subscribe(v)
 		}
 
-		// Notify of the new tiles by invoking the update
-		page.Each(x, y, func(p Point, tile Tile) {
-			if !prev.Contains(p) {
-				v.Inbox <- Update{Point: p, Tile: tile}
-			}
-		})
+		// Callback for each new tile in the view
+		if fn != nil {
+			page.Each(x, y, func(p Point, tile Tile) {
+				if !prev.Contains(p) && box.Contains(p) {
+					fn(p, tile)
+				}
+			})
+		}
 	})
 }
 
 // MoveBy moves the viewport towards a particular direction.
-func (v *View) MoveBy(x, y int16) {
+func (v *View) MoveBy(x, y int16, fn Iterator) {
 	v.Resize(Rect{
 		Min: v.rect.Min.Add(At(x, y)),
 		Max: v.rect.Max.Add(At(x, y)),
-	})
+	}, fn)
 }
 
 // MoveAt moves the viewport to a specific coordinate.
-func (v *View) MoveAt(nw Point) {
+func (v *View) MoveAt(nw Point, fn Iterator) {
 	size := v.rect.Max.Subtract(v.rect.Min)
 	v.Resize(Rect{
 		Min: nw,
 		Max: nw.Add(size),
-	})
+	}, fn)
 }
 
 // Each iterates over all of the tiles in the view.
@@ -77,11 +81,6 @@ func (v *View) At(x, y int16) (Tile, bool) {
 // UpdateAt updates the tile at a specific coordinate.
 func (v *View) UpdateAt(x, y int16, tile Tile) {
 	v.Map.UpdateAt(x, y, tile)
-}
-
-// Neighbors iterates over the direct neighbouring tiles.
-func (v *View) Neighbors(x, y int16, fn Iterator) {
-	v.Map.Neighbors(x, y, fn)
 }
 
 // onUpdate occurs when a tile has updated.

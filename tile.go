@@ -129,14 +129,15 @@ func (m *Map) Neighbors(x, y int16, fn Iterator) {
 }
 
 // View creates a new view of the map.
-func (m *Map) View(rect Rect) *View {
+func (m *Map) View(rect Rect, fn Iterator) *View {
 	view := &View{
 		Map:   m,
 		Inbox: make(chan Update, 8),
+		rect:  NewRect(-1, -1, -1, -1),
 	}
 
 	// Call the resize method
-	view.Resize(rect)
+	view.Resize(rect, fn)
 	return view
 }
 

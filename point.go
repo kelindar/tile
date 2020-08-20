@@ -7,6 +7,8 @@ import (
 	"fmt"
 )
 
+const invalid = int16(-1 << 15)
+
 // -----------------------------------------------------------------------------
 
 // Point represents a 2D coordinate.
