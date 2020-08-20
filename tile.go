@@ -5,12 +5,13 @@ package tile
 
 // Iterator represents an iterator function.
 type Iterator = func(Point, Tile)
+type pageFn = func(int16, int16, *page)
 
 // Map represents a 2D tile map. Internally, a map is composed of 3x3 pages.
 type Map struct {
 	pages      [][]page // The pages of the map
-	pageWidth  int16   // The max page width
-	pageHeight int16   // The max page height
+	pageWidth  int16    // The max page width
+	pageHeight int16    // The max page height
 	Size       Point    // The map size
 }
 
@@ -35,7 +36,7 @@ func NewMap(width, height int16) *Map {
 func (m *Map) Each(fn Iterator) {
 	for y := int16(0); y < m.pageHeight; y++ {
 		for x := int16(0); x < m.pageWidth; x++ {
-			m.pages[x][y].Each(x*3, int16(y)*3, fn)
+			m.pages[x][y].Each(x*3, y*3, fn)
 		}
 	}
 }
@@ -43,17 +44,25 @@ func (m *Map) Each(fn Iterator) {
 // Within selects the tiles within a specifid bounding box which is specified by
 // north-west and south-east coordinates.
 func (m *Map) Within(nw, se Point, fn Iterator) {
+	m.pagesWithin(nw, se, func(x, y int16, page *page) {
+		page.Each(x, y, func(p Point, tile Tile) {
+			if p.Within(nw, se) {
+				fn(p, tile)
+			}
+		})
+	})
+}
+
+// pagesWithin selects the pages within a specifid bounding box which is specified
+// by north-west and south-east coordinates.
+func (m *Map) pagesWithin(nw, se Point, fn pageFn) {
 	if !se.WithinSize(m.Size) {
 		se = At(m.Size.X-1, m.Size.Y-1)
 	}
 
 	for y := nw.Y / 3; y <= se.Y/3; y++ {
 		for x := nw.X / 3; x <= se.X/3; x++ {
-			m.pages[x][y].Each(x*3, int16(y)*3, func(p Point, tile Tile) {
-				if p.Within(nw, se) {
-					fn(p, tile)
-				}
-			})
+			fn(x*3, y*3, &(m.pages[x][y]))
 		}
 	}
 }
@@ -111,6 +120,15 @@ func (m *Map) Neighbors(x, y int16, fn Iterator) {
 		if tile := m.pages[wX][wY].Get(x-1, y); !tile.IsBlocked() {
 			fn(At(x-1, y), tile)
 		}
+	}
+}
+
+// View creates a new view of the map.
+func (m *Map) View(rect Rect) *View {
+	return &View{
+		Map:   m,
+		Inbox: make(chan Update, 8),
+		rect:  rect,
 	}
 }
 
@@ -186,7 +204,7 @@ func (p *page) Each(x, y int16, fn Iterator) {
 }
 
 // Subscribe registers an event listener on a system
-func (p *page) Subscribe(sub Observer) {
+func (p *page) Subscribe(sub observer) {
 	if p.event == nil {
 		p.event = newSignal()
 	}
@@ -195,10 +213,6 @@ func (p *page) Subscribe(sub Observer) {
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (p *page) Unsubscribe(sub Observer) {
-	if p.event == nil {
-		p.event = newSignal()
-	}
-
+func (p *page) Unsubscribe(sub observer) {
 	p.event.Unsubscribe(sub)
 }

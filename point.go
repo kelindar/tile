@@ -7,19 +7,6 @@ import (
 	"fmt"
 )
 
-// Direction vectors
-/*var (
-	NorthWest = At(-1, -1)
-	North     = At(0, -1)
-	NorthEast = At(+1, -1)
-	West      = At(-1, 0)
-	Zero      = At(0, 0)
-	East      = At(+1, 0)
-	SouthWest = At(-1, +1)
-	South     = At(0, +1)
-	SouthEast = At(+1, +1)
-)*/
-
 // -----------------------------------------------------------------------------
 
 // Point represents a 2D coordinate.
@@ -121,4 +108,14 @@ type Rect struct {
 // NewRect creates a new rectangle
 func NewRect(left, top, bottom, right int16) Rect {
 	return Rect{Min: At(left, top), Max: At(bottom, right)}
+}
+
+// Contains returns whether a point is within the rectangle or not.
+func (r *Rect) Contains(p Point) bool {
+	return p.X >= r.Min.X && p.Y >= r.Min.Y && p.X <= r.Max.X && p.Y <= r.Max.Y
+}
+
+// Intersects returns whether a rectangle intersects with another rectangle or not.
+func (r *Rect) Intersects(box Rect) bool {
+	return !(box.Max.X < r.Min.X || box.Min.X > r.Max.X || box.Max.Y < r.Min.Y || box.Min.Y > r.Max.Y)
 }
