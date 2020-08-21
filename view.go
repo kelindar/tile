@@ -88,6 +88,16 @@ func (v *View) UpdateAt(x, y int16, tile Tile) {
 	v.Map.UpdateAt(x, y, tile)
 }
 
+// Close closes the view and unsubscribes from everything.
+func (v *View) Close() error {
+	v.Map.pagesWithin(v.rect.Min, v.rect.Max, func(page *page) {
+		if v.Map.observers.Unsubscribe(page.point, v) {
+			page.SetObserved(false) // Mark the page as not being observed
+		}
+	})
+	return nil
+}
+
 // onUpdate occurs when a tile has updated.
 func (v *View) onUpdate(ev *Update) {
 	if v.rect.Contains(ev.Point) {

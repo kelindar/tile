@@ -75,6 +75,11 @@ func TestView(t *testing.T) {
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
 	assert.Equal(t, tile, update.Tile)
+
+	// Close the view
+	assert.NoError(t, v.Close())
+	v.UpdateAt(5, 5, tile)
+	assert.Equal(t, 0, len(v.Inbox))
 }
 
 type counter int
