@@ -52,8 +52,8 @@ func TestDraw(t *testing.T) {
 	assert.NoError(t, f.Close())*/
 }
 
-// BenchmarkPath/9x9-8         	  342571	      3342 ns/op	     712 B/op	       4 allocs/op
-// BenchmarkPath/300x300-8     	     579	   2098446 ns/op	  532455 B/op	     255 allocs/op
+// BenchmarkPath/9x9-8         	  203390	      5439 ns/op	   16468 B/op	       3 allocs/op
+// BenchmarkPath/300x300-8     	     417	   2544436 ns/op	 7801171 B/op	       4 allocs/op
 func BenchmarkPath(b *testing.B) {
 	b.Run("9x9", func(b *testing.B) {
 		m := mapFrom("9x9.png")
@@ -74,9 +74,9 @@ func BenchmarkPath(b *testing.B) {
 	})
 }
 
-// BenchmarkAround/3r-8         	  307948	      3767 ns/op	     500 B/op	       5 allocs/op
-// BenchmarkAround/5r-8         	  141174	      8472 ns/op	     921 B/op	      10 allocs/op
-// BenchmarkAround/10r-8        	   54306	     22097 ns/op	    3788 B/op	      12 allocs/op
+// BenchmarkAround/3r-8         	  352876	      3355 ns/op	     385 B/op	       1 allocs/op
+// BenchmarkAround/5r-8         	  162103	      7551 ns/op	     931 B/op	       2 allocs/op
+// BenchmarkAround/10r-8        	   62491	     19235 ns/op	    3489 B/op	       2 allocs/op
 func BenchmarkAround(b *testing.B) {
 	m := mapFrom("300x300.png")
 	b.Run("3r", func(b *testing.B) {
@@ -106,21 +106,24 @@ func BenchmarkAround(b *testing.B) {
 
 func TestAround(t *testing.T) {
 	m := mapFrom("9x9.png")
-	var path []string
-	m.Around(At(2, 2), 3, costOf, func(p Point, tile Tile) {
-		path = append(path, p.String())
-	})
-	assert.Equal(t, 10, len(path))
-	assert.ElementsMatch(t, []string{
-		"2,2", "2,1", "2,3", "1,2", "3,1",
-		"1,1", "1,3", "3,3", "4,3", "3,4",
-	}, path)
+
+	for i := 0; i < 3; i++ {
+		var path []string
+		m.Around(At(2, 2), 3, costOf, func(p Point, tile Tile) {
+			path = append(path, p.String())
+		})
+		assert.Equal(t, 10, len(path))
+		assert.ElementsMatch(t, []string{
+			"2,2", "2,1", "2,3", "1,2", "3,1",
+			"1,1", "1,3", "3,3", "4,3", "3,4",
+		}, path)
+	}
 }
 
 // BenchmarkHeap-8   	   94454	     12303 ns/op	    3968 B/op	       5 allocs/op
 func BenchmarkHeap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		h := newHeap32()
+		h := newHeap32(16)
 		for j := 0; j < 128; j++ {
 			h.Push(rand(j), 1)
 		}
@@ -132,13 +135,13 @@ func BenchmarkHeap(b *testing.B) {
 }
 
 func TestHeap(t *testing.T) {
-	h := newHeap32()
+	h := newHeap32(16)
 	h.Push(1, 0)
 	h.Pop()
 }
 
 func TestNewHeap(t *testing.T) {
-	h := newHeap32()
+	h := newHeap32(16)
 	for j := 0; j < 8; j++ {
 		h.Push(rand(j), uint32(j))
 	}

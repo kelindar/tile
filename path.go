@@ -3,6 +3,11 @@
 
 package tile
 
+import (
+	"math"
+	"sync"
+)
+
 type costFn = func(Tile) uint16
 
 // Edge represents an edge of the path
@@ -18,10 +23,18 @@ func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 		return
 	}
 
+	// For pre-allocating, we use πr2 since BFS will result in a approximation
+	// of a circle, in the worst case.
+	maxArea := int(math.Ceil(math.Pi * float64(distance*distance))) // Circle area
+	//	maxFrontier := int(math.Ceil(2 * math.Pi * float64(distance)))  // Circle circumference
+
 	fn(from, start)
-	frontier := newHeap32()
+	//frontier := newHeap32(maxFrontier)
+	frontier := acquireHeap()
 	frontier.Push(from.Integer(), 0)
-	reached := make(map[uint32]struct{}, distance*distance) // TODO: too much here
+	defer releaseHeap(frontier)
+
+	reached := make(map[uint32]struct{}, maxArea)
 	reached[from.Integer()] = struct{}{}
 
 	for !frontier.IsEmpty() {
@@ -51,12 +64,17 @@ func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 
 // Path calculates a short path and the distance between the two locations
 func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
-	frontier := newHeap32()
+	distance := float64(from.DistanceTo(to))
+	maxArea := int(math.Ceil(math.Pi * distance * distance)) // Circle area
+	//maxFrontier := int(math.Ceil(2 * math.Pi * distance))    // Circle circumference
+
+	//frontier := newHeap32(maxFrontier)
+	frontier := acquireHeap()
 	frontier.Push(from.Integer(), 0)
+	defer releaseHeap(frontier)
 
 	// Add the first edge
-	capacity := int(float32(from.DistanceTo(to)) * 1.5)
-	edges := make(map[uint32]edge, capacity)
+	edges := make(map[uint32]edge, maxArea)
 	edges[from.Integer()] = edge{
 		Point: from,
 		Cost:  0,
@@ -107,6 +125,24 @@ func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 
 // -----------------------------------------------------------------------------
 
+var heapPool = sync.Pool{
+	New: func() interface{} { return new(heap32) },
+}
+
+// Acquires a new instance of a heap
+func acquireHeap() *heap32 {
+	h := heapPool.Get().(*heap32)
+	h.Reset()
+	return h
+}
+
+// Releases a heap instance back to the pool
+func releaseHeap(h *heap32) {
+	heapPool.Put(h)
+}
+
+// -----------------------------------------------------------------------------
+
 // heapNode represents a ranked node for the heap.
 type heapNode struct {
 	Value uint32 // The value of the ranked node.
@@ -115,8 +151,13 @@ type heapNode struct {
 
 type heap32 []heapNode
 
-func newHeap32() heap32 {
-	return make(heap32, 0, 16)
+func newHeap32(capacity int) heap32 {
+	return make(heap32, 0, capacity)
+}
+
+// Reset clears the heap for reuse
+func (h *heap32) Reset() {
+	*h = (*h)[:0]
 }
 
 // Push pushes the element x onto the heap.
