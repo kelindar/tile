@@ -17,7 +17,7 @@ type edge struct {
 }
 
 // Around performs a breadth first search around a point.
-func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
+func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 	start, ok := m.At(from.X, from.Y)
 	if !ok {
 		return
@@ -62,7 +62,7 @@ func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 }
 
 // Path calculates a short path and the distance between the two locations
-func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
+func (m *Grid) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 
 	// Acquire a frontier heap for search
 	frontier := acquireHeap()

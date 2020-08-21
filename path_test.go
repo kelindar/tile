@@ -42,7 +42,7 @@ func TestPath(t *testing.T) {
 
 func TestDraw(t *testing.T) {
 	m := mapFrom("9x9.png")
-	out := drawMap(m, NewRect(0, 0, 0, 0))
+	out := drawGrid(m, NewRect(0, 0, 0, 0))
 	assert.NotNil(t, out)
 	/*f, err := os.Create("image.png")
 	defer f.Close()
@@ -175,7 +175,7 @@ func costOf(tile Tile) uint16 {
 }
 
 // mapFrom creates a map from ASCII string
-func mapFrom(name string) *Map {
+func mapFrom(name string) *Grid {
 	f, err := os.Open("fixtures/" + name)
 	defer f.Close()
 	if err != nil {
@@ -188,7 +188,7 @@ func mapFrom(name string) *Map {
 		panic(err)
 	}
 
-	m := NewMap(int16(img.Bounds().Dx()), int16(img.Bounds().Dy()))
+	m := NewGrid(int16(img.Bounds().Dx()), int16(img.Bounds().Dy()))
 	for y := int16(0); y < m.Size.Y; y++ {
 		for x := int16(0); x < m.Size.X; x++ {
 			//fmt.Printf("%+v %T\n", img.At(int(x), int(y)), img.At(int(x), int(y)))
@@ -204,7 +204,7 @@ func mapFrom(name string) *Map {
 }
 
 // plotPath plots the path on ASCII map
-func plotPath(m *Map, path []Point) string {
+func plotPath(m *Grid, path []Point) string {
 	out := make([][]byte, m.Size.Y)
 	for i := range out {
 		out[i] = make([]byte, m.Size.X)
@@ -240,7 +240,7 @@ func pointInPath(point Point, path []Point) bool {
 }
 
 // draw converts the map to a black and white image for debugging purposes.
-func drawMap(m *Map, rect Rect) image.Image {
+func drawGrid(m *Grid, rect Rect) image.Image {
 	if rect.Max.X == 0 || rect.Max.Y == 0 {
 		rect = NewRect(0, 0, m.Size.X, m.Size.Y)
 	}

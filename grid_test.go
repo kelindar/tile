@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Benchmark_Map/each-8         	     278	   4255305 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/neighbors-8    	16901694	        70.9 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/within-8       	   20338	     58561 ns/op	       0 B/op	       0 allocs/op
-func Benchmark_Map(b *testing.B) {
+// Benchmark_Grid/each-8         	     278	   4255305 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Grid/neighbors-8    	16901694	        70.9 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Grid/within-8       	   20338	     58561 ns/op	       0 B/op	       0 allocs/op
+func Benchmark_Grid(b *testing.B) {
 	var d [6]byte
 	defer assert.NotNil(b, d)
-	m := NewMap(900, 900)
+	m := NewGrid(900, 900)
 
 	b.Run("each", func(b *testing.B) {
 		b.ReportAllocs()
@@ -54,7 +54,7 @@ func TestPageSize(t *testing.T) {
 }
 
 func TestWithin(t *testing.T) {
-	m := NewMap(9, 9)
+	m := NewGrid(9, 9)
 
 	var path []string
 	m.Within(At(1, 1), At(5, 5), func(p Point, tile Tile) {
@@ -71,7 +71,7 @@ func TestWithin(t *testing.T) {
 }
 
 func TestWithinCorner(t *testing.T) {
-	m := NewMap(9, 9)
+	m := NewGrid(9, 9)
 
 	var path []string
 	m.Within(At(7, 6), At(10, 10), func(p Point, tile Tile) {
@@ -85,7 +85,7 @@ func TestWithinCorner(t *testing.T) {
 }
 
 func TestWithinInvalid(t *testing.T) {
-	m := NewMap(9, 9)
+	m := NewGrid(9, 9)
 	count := 0
 	m.Within(At(10, 10), At(20, 20), func(p Point, tile Tile) {
 		count++
@@ -94,7 +94,7 @@ func TestWithinInvalid(t *testing.T) {
 }
 
 func TestEach(t *testing.T) {
-	m := NewMap(9, 9)
+	m := NewGrid(9, 9)
 
 	var path []string
 	m.Each(func(p Point, tile Tile) {
@@ -127,7 +127,7 @@ func TestNeighbors(t *testing.T) {
 	}
 
 	// Create a 9x9 map with labeled tiles
-	m := NewMap(9, 9)
+	m := NewGrid(9, 9)
 	m.Each(func(p Point, tile Tile) {
 		copy(tile[:], p.String()[:3])
 		m.UpdateAt(p.X, p.Y, tile)
@@ -146,7 +146,7 @@ func TestNeighbors(t *testing.T) {
 func TestAt(t *testing.T) {
 
 	// Create a 9x9 map with labeled tiles
-	m := NewMap(9, 9)
+	m := NewGrid(9, 9)
 	m.Each(func(p Point, tile Tile) {
 		copy(tile[:], p.String()[:3])
 		m.UpdateAt(p.X, p.Y, tile)

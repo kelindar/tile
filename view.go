@@ -15,16 +15,16 @@ type Update struct {
 
 // View represents a view which can monitor a collection of tiles.
 type View struct {
-	Map   *Map        // The associated map
+	Grid  *Grid       // The associated map
 	Inbox chan Update // The update inbox for the view
 	rect  Rect        // The view box
 }
 
 // Resize resizes the viewport.
 func (v *View) Resize(box Rect, fn Iterator) {
-	owner := v.Map // The parent map
-	prev := v.rect // Previous bounding box
-	v.rect = box   // New bounding box
+	owner := v.Grid // The parent map
+	prev := v.rect  // Previous bounding box
+	v.rect = box    // New bounding box
 
 	// Unsubscribe from the pages which are not required anymore
 	if prev.Min.X >= 0 || prev.Min.Y >= 0 || prev.Max.X >= 0 || prev.Max.Y >= 0 {
@@ -75,23 +75,23 @@ func (v *View) MoveAt(nw Point, fn Iterator) {
 
 // Each iterates over all of the tiles in the view.
 func (v *View) Each(fn Iterator) {
-	v.Map.Within(v.rect.Min, v.rect.Max, fn)
+	v.Grid.Within(v.rect.Min, v.rect.Max, fn)
 }
 
 // At returns the tile at a specified position.
 func (v *View) At(x, y int16) (Tile, bool) {
-	return v.Map.At(x, y)
+	return v.Grid.At(x, y)
 }
 
 // UpdateAt updates the tile at a specific coordinate.
 func (v *View) UpdateAt(x, y int16, tile Tile) {
-	v.Map.UpdateAt(x, y, tile)
+	v.Grid.UpdateAt(x, y, tile)
 }
 
 // Close closes the view and unsubscribes from everything.
 func (v *View) Close() error {
-	v.Map.pagesWithin(v.rect.Min, v.rect.Max, func(page *page) {
-		if v.Map.observers.Unsubscribe(page.point, v) {
+	v.Grid.pagesWithin(v.rect.Min, v.rect.Max, func(page *page) {
+		if v.Grid.observers.Unsubscribe(page.point, v) {
 			page.SetObserved(false) // Mark the page as not being observed
 		}
 	})

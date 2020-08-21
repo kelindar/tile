@@ -12,8 +12,8 @@ import (
 type Iterator = func(Point, Tile)
 type pageFn = func(*page)
 
-// Map represents a 2D tile map. Internally, a map is composed of 3x3 pages.
-type Map struct {
+// Grid represents a 2D tile map. Internally, a map is composed of 3x3 pages.
+type Grid struct {
 	pages      [][]page // The pages of the map
 	pageWidth  int16    // The max page width
 	pageHeight int16    // The max page height
@@ -21,9 +21,9 @@ type Map struct {
 	Size       Point    // The map size
 }
 
-// NewMap returns a new map of the specified size. The width and height must be both
+// NewGrid returns a new map of the specified size. The width and height must be both
 // multiples of 3.
-func NewMap(width, height int16) *Map {
+func NewGrid(width, height int16) *Grid {
 	width, height = width/3, height/3
 	pages := make([][]page, height)
 	for x := int16(0); x < width; x++ {
@@ -33,7 +33,7 @@ func NewMap(width, height int16) *Map {
 		}
 	}
 
-	return &Map{
+	return &Grid{
 		pages:      pages,
 		pageWidth:  width,
 		pageHeight: height,
@@ -43,7 +43,7 @@ func NewMap(width, height int16) *Map {
 }
 
 // Each iterates over all of the tiles in the map.
-func (m *Map) Each(fn Iterator) {
+func (m *Grid) Each(fn Iterator) {
 	for y := int16(0); y < m.pageHeight; y++ {
 		for x := int16(0); x < m.pageWidth; x++ {
 			m.pages[x][y].Each(fn)
@@ -53,7 +53,7 @@ func (m *Map) Each(fn Iterator) {
 
 // Within selects the tiles within a specifid bounding box which is specified by
 // north-west and south-east coordinates.
-func (m *Map) Within(nw, se Point, fn Iterator) {
+func (m *Grid) Within(nw, se Point, fn Iterator) {
 	m.pagesWithin(nw, se, func(page *page) {
 		page.Each(func(p Point, tile Tile) {
 			if p.Within(nw, se) {
@@ -65,7 +65,7 @@ func (m *Map) Within(nw, se Point, fn Iterator) {
 
 // pagesWithin selects the pages within a specifid bounding box which is specified
 // by north-west and south-east coordinates.
-func (m *Map) pagesWithin(nw, se Point, fn pageFn) {
+func (m *Grid) pagesWithin(nw, se Point, fn pageFn) {
 	if !se.WithinSize(m.Size) {
 		se = At(m.Size.X-1, m.Size.Y-1)
 	}
@@ -78,7 +78,7 @@ func (m *Map) pagesWithin(nw, se Point, fn pageFn) {
 }
 
 // At returns the tile at a specified position
-func (m *Map) At(x, y int16) (Tile, bool) {
+func (m *Grid) At(x, y int16) (Tile, bool) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
 		return m.pages[x/3][y/3].Get(x, y), true
 	}
@@ -87,7 +87,7 @@ func (m *Map) At(x, y int16) (Tile, bool) {
 }
 
 // UpdateAt updates the tile at a specific coordinate
-func (m *Map) UpdateAt(x, y int16, tile Tile) {
+func (m *Grid) UpdateAt(x, y int16, tile Tile) {
 
 	// Update the tile in the map
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
@@ -99,7 +99,7 @@ func (m *Map) UpdateAt(x, y int16, tile Tile) {
 }
 
 // Neighbors iterates over the direct neighbouring tiles
-func (m *Map) Neighbors(x, y int16, fn Iterator) {
+func (m *Grid) Neighbors(x, y int16, fn Iterator) {
 
 	// First we need to figure out which pages contain the neighboring tiles and
 	// then load them. In the best-case we need to load only a single page. In
@@ -131,9 +131,9 @@ func (m *Map) Neighbors(x, y int16, fn Iterator) {
 }
 
 // View creates a new view of the map.
-func (m *Map) View(rect Rect, fn Iterator) *View {
+func (m *Grid) View(rect Rect, fn Iterator) *View {
 	view := &View{
-		Map:   m,
+		Grid:  m,
 		Inbox: make(chan Update, 8),
 		rect:  NewRect(-1, -1, -1, -1),
 	}
