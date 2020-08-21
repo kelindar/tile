@@ -162,8 +162,11 @@ func (s *observers) Notify(ev *Update) {
 	}
 
 	s.Lock()
-	defer s.Unlock()
-	for _, sub := range s.subs {
+	subs := s.subs
+	s.Unlock()
+
+	// Update every subscriber
+	for _, sub := range subs {
 		sub.onUpdate(ev)
 	}
 }
@@ -173,7 +176,7 @@ func (s *observers) Subscribe(sub observer) bool {
 	s.Lock()
 	defer s.Unlock()
 	s.subs = append(s.subs, sub)
-	return len(s.subs) == 1 // At least one
+	return len(s.subs) > 0 // At least one
 }
 
 // Unsubscribe deregisters an event listener from a system

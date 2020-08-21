@@ -10,16 +10,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkView/update-8         	15583524	        77.1 ns/op	      16 B/op	       1 allocs/op
+// BenchmarkView/update-8         	10256436	       115 ns/op	      16 B/op	       1 allocs/op
+// BenchmarkView/move-8           	    6667	    180595 ns/op	   18480 B/op	    1155 allocs/op
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
 	v := m.View(NewRect(100, 0, 199, 99), nil)
+
 	b.Run("update", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			v.UpdateAt(150, 50, Tile{})
+			v.UpdateAt(152, 52, Tile{})
 			<-v.Inbox
+		}
+	})
+
+	b.Run("move", func(b *testing.B) {
+		locs := []Point{
+			At(100, 0),
+			At(200, 100),
+		}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			v.MoveAt(locs[n%2], nil)
 		}
 	})
 }
