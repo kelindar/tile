@@ -1,6 +1,10 @@
 # Tile: Data-Oriented 2D Grid Engine
+<p align="center">
+    <img width="340" height="152" src="./fixtures/logo.png">
+</p>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/kelindar/tile)](https://goreportcard.com/report/github.com/kelindar/tile)
+
 
 This repository contains a 2D tile map engine which is built with data and cache friendly ways. My main goal here is to provide a simple, high performance library to handle large scale tile maps in games.
 
