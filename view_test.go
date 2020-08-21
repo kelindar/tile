@@ -11,7 +11,7 @@ import (
 )
 
 // BenchmarkView/update-8         	10256436	       115 ns/op	      16 B/op	       1 allocs/op
-// BenchmarkView/move-8           	    6667	    180595 ns/op	   18480 B/op	    1155 allocs/op
+// BenchmarkView/move-8           	    7485	    153640 ns/op	       0 B/op	       0 allocs/op
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
 	v := m.View(NewRect(100, 0, 199, 99), nil)

@@ -184,7 +184,7 @@ func (s *observers) Unsubscribe(sub observer) bool {
 	s.Lock()
 	defer s.Unlock()
 
-	clean := make([]observer, 0, len(s.subs))
+	clean := s.subs[:0]
 	for _, o := range s.subs {
 		if o != sub {
 			clean = append(clean, o)
