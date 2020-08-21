@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Benchmark_Map/each-8         	     279	   4444495 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/neighbors-8    	38763946	        30.9 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/within-8       	   17290	     69175 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/each-8         	     567	   2075837 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/neighbors-8    	36360330	        33.4 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/within-8       	   35290	     34146 ns/op	       0 B/op	       0 allocs/op
 func Benchmark_Map(b *testing.B) {
 	var d [5]byte
 	defer assert.NotNil(b, d)

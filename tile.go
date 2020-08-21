@@ -6,6 +6,7 @@ package tile
 import (
 	"image"
 	"image/color"
+	//"sync"
 )
 
 // Iterator represents an iterator function.
@@ -202,6 +203,7 @@ const (
 // page represents a 3x3 tile page each page should neatly fit on a cache
 // line and speed things up.
 type page struct {
+	//lock  sync.Mutex // Page lock for the page
 	event *signal // Page signals, 8 bytes
 	Tiles [9]Tile // Page tiles, 54 bytes
 	Flags uint16  // Page flags, 2 bytes
@@ -220,15 +222,13 @@ func (p *page) Set(x, y int16, tile Tile) {
 
 // UpdateEach iterates over all of the tiles in the page.
 func (p *page) Each(x, y int16, fn Iterator) {
-	fn(At(x, y), p.Tiles[0])     // NW
-	fn(At(x+1, y), p.Tiles[1])   // N
-	fn(At(x+2, y), p.Tiles[2])   // NE
-	fn(At(x, y+1), p.Tiles[3])   // W
-	fn(At(x+1, y+1), p.Tiles[4]) // C
-	fn(At(x+2, y+1), p.Tiles[5]) // E
-	fn(At(x, y+2), p.Tiles[6])   // SW
-	fn(At(x+1, y+2), p.Tiles[7]) // S
-	fn(At(x+2, y+2), p.Tiles[8]) // SE
+	i, mX, mY := 0, x+3, y+3
+	for ; x < mX; x++ {
+		for ; y < mY; y++ {
+			fn(At(x, y), p.Tiles[i])
+			i++
+		}
+	}
 }
 
 // Subscribe registers an event listener on a system
