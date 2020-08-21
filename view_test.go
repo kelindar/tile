@@ -55,7 +55,7 @@ func TestView(t *testing.T) {
 
 	// Update a tile in view
 	tile, _ := v.At(5, 5)
-	tile.Data[0] = 55
+	tile[0] = 55
 	v.UpdateAt(5, 5, tile)
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
@@ -68,8 +68,8 @@ func (c *counter) count(p Point, tile Tile) {
 	*c++
 }
 
-func TestSignal(t *testing.T) {
-	ev := newSignal()
+func TestObservers(t *testing.T) {
+	ev := newObservers()
 	assert.NotNil(t, ev)
 
 	// Subscriber which does nothing
@@ -83,9 +83,9 @@ func TestSignal(t *testing.T) {
 	}
 	ev.Subscribe(&sub2)
 
-	ev.Notify(At(1, 0), Tile{})
-	ev.Notify(At(2, 0), Tile{})
-	ev.Notify(At(3, 0), Tile{})
+	ev.Notify(&Update{Point: At(1, 0)})
+	ev.Notify(&Update{Point: At(2, 0)})
+	ev.Notify(&Update{Point: At(3, 0)})
 
 	for count < 6 {
 		time.Sleep(1 * time.Millisecond)
@@ -94,14 +94,14 @@ func TestSignal(t *testing.T) {
 	assert.Equal(t, 6, count)
 	ev.Unsubscribe(&sub2)
 
-	ev.Notify(At(2, 0), Tile{})
+	ev.Notify(&Update{Point: At(2, 0)})
 	assert.Equal(t, 6, count)
 }
 
-func TestSignalNil(t *testing.T) {
+func TestObserversNil(t *testing.T) {
 	assert.NotPanics(t, func() {
-		var ev *signal
-		ev.Notify(At(1, 0), Tile{})
+		var ev *observers
+		ev.Notify(&Update{Point: At(1, 0)})
 	})
 }
 

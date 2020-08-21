@@ -4,6 +4,7 @@
 package tile
 
 import (
+	"image"
 	"image/color"
 	"image/png"
 	"os"
@@ -15,7 +16,7 @@ import (
 
 func TestPath(t *testing.T) {
 	m := mapFrom("9x9.png")
-	path, dist, found := m.Path(At(1, 1), At(7, 7))
+	path, dist, found := m.Path(At(1, 1), At(7, 7), costOf)
 	assert.Equal(t, `
 .........
 . x .   .
@@ -41,7 +42,7 @@ func TestPath(t *testing.T) {
 
 func TestDraw(t *testing.T) {
 	m := mapFrom("9x9.png")
-	out := m.draw(NewRect(0, 0, 0, 0))
+	out := drawMap(m, NewRect(0, 0, 0, 0))
 	assert.NotNil(t, out)
 	/*f, err := os.Create("image.png")
 	defer f.Close()
@@ -59,7 +60,7 @@ func Benchmark_Path(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Path(At(1, 1), At(7, 7))
+			m.Path(At(1, 1), At(7, 7), costOf)
 		}
 	})
 
@@ -68,7 +69,7 @@ func Benchmark_Path(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Path(At(115, 20), At(160, 270))
+			m.Path(At(115, 20), At(160, 270), costOf)
 		}
 	})
 }
@@ -119,6 +120,14 @@ func rand(i int) uint32 {
 
 // -----------------------------------------------------------------------------
 
+// Cost estimation function
+func costOf(tile Tile) uint16 {
+	if (tile[0])&1 != 0 {
+		return 0 // Blocked
+	}
+	return 1
+}
+
 // mapFrom creates a map from ASCII string
 func mapFrom(name string) *Map {
 	f, err := os.Open("fixtures/" + name)
@@ -141,9 +150,7 @@ func mapFrom(name string) *Map {
 			switch v.R {
 			case 255:
 			case 0:
-				m.UpdateAt(x, y, Tile{
-					Flags: Blocked,
-				})
+				m.UpdateAt(x, y, Tile{1, 0, 0, 0, 0, 0})
 			}
 		}
 	}
@@ -181,7 +188,7 @@ func plotPath(m *Map, path []Point) string {
 		switch {
 		case pointInPath(l, path):
 			out[l.Y][l.X] = 'x'
-		case tile.Flags&Blocked != 0:
+		case tile[0]&1 != 0:
 			out[l.Y][l.X] = '.'
 		default:
 			out[l.Y][l.X] = ' '
@@ -204,4 +211,23 @@ func pointInPath(point Point, path []Point) bool {
 		}
 	}
 	return false
+}
+
+// draw converts the map to a black and white image for debugging purposes.
+func drawMap(m *Map, rect Rect) image.Image {
+	if rect.Max.X == 0 || rect.Max.Y == 0 {
+		rect = NewRect(0, 0, m.Size.X, m.Size.Y)
+	}
+
+	size := rect.Size()
+	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
+	m.Within(rect.Min, rect.Max, func(p Point, tile Tile) {
+		a := uint8(255)
+		if tile[0] == 1 {
+			a = 0
+		}
+
+		output.SetRGBA(int(p.X), int(p.Y), color.RGBA{a, a, a, 255})
+	})
+	return output
 }

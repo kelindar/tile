@@ -22,27 +22,32 @@ type View struct {
 
 // Resize resizes the viewport.
 func (v *View) Resize(box Rect, fn Iterator) {
+	owner := v.Map // The parent map
 	prev := v.rect // Previous bounding box
 	v.rect = box   // New bounding box
 
 	// Unsubscribe from the pages which are not required anymore
 	if prev.Min.X >= 0 || prev.Min.Y >= 0 || prev.Max.X >= 0 || prev.Max.Y >= 0 {
-		v.Map.pagesWithin(prev.Min, prev.Max, func(x, y int16, page *page) {
-			if bounds := NewRect(x, y, x+3, y+3); !bounds.Intersects(box) {
-				page.Unsubscribe(v)
+		owner.pagesWithin(prev.Min, prev.Max, func(page *page) {
+			if bounds := page.Bounds(); !bounds.Intersects(box) {
+				if owner.observers.Unsubscribe(page.point, v) {
+					page.SetObserved(false) // Mark the page as not being observed
+				}
 			}
 		})
 	}
 
 	// Subscribe to every page which we have not previously subscribed
-	v.Map.pagesWithin(box.Min, box.Max, func(x, y int16, page *page) {
-		if bounds := NewRect(x, y, x+3, y+3); !bounds.Intersects(prev) {
-			page.Subscribe(v)
+	owner.pagesWithin(box.Min, box.Max, func(page *page) {
+		if bounds := page.Bounds(); !bounds.Intersects(prev) {
+			if owner.observers.Subscribe(page.point, v) {
+				page.SetObserved(true) // Mark the page as being observed
+			}
 		}
 
 		// Callback for each new tile in the view
 		if fn != nil {
-			page.Each(x, y, func(p Point, tile Tile) {
+			page.Each(func(p Point, tile Tile) {
 				if !prev.Contains(p) && box.Contains(p) {
 					fn(p, tile)
 				}
@@ -100,47 +105,79 @@ type observer interface {
 	onUpdate(*Update)
 }
 
-// Signal represents a change notifier which notifies the subscribers when
+// Pubsub represents a publish/subscribe layer for observers.
+type pubsub struct {
+	m sync.Map
+}
+
+// Notify notifies listeners of an update that happened.
+func (p *pubsub) Notify(page, point Point, tile Tile) {
+	if v, ok := p.m.Load(page.Integer()); ok {
+		v.(*observers).Notify(&Update{
+			Point: point,
+			Tile:  tile,
+		})
+	}
+}
+
+// Subscribe registers an event listener on a system
+func (p *pubsub) Subscribe(at Point, sub observer) bool {
+	if v, ok := p.m.Load(at.Integer()); ok {
+		return v.(*observers).Subscribe(sub)
+	}
+
+	// Slow path
+	v, _ := p.m.LoadOrStore(at.Integer(), newObservers())
+	return v.(*observers).Subscribe(sub)
+}
+
+// Unsubscribe deregisters an event listener from a system
+func (p *pubsub) Unsubscribe(at Point, sub observer) bool {
+	if v, ok := p.m.Load(at.Integer()); ok {
+		return v.(*observers).Unsubscribe(sub)
+	}
+	return false
+}
+
+// -----------------------------------------------------------------------------
+
+// Observers represents a change notifier which notifies the subscribers when
 // a specific tile is updated.
-type signal struct {
-	sync.RWMutex
+type observers struct {
+	sync.Mutex
 	subs []observer
 }
 
-// newNotifier creates a new instance of an change observer.
-func newSignal() *signal {
-	return &signal{
+// newObservers creates a new instance of an change observer.
+func newObservers() *observers {
+	return &observers{
 		subs: make([]observer, 0, 8),
 	}
 }
 
 // Notify notifies listeners of an update that happened.
-func (s *signal) Notify(point Point, tile Tile) {
+func (s *observers) Notify(ev *Update) {
 	if s == nil {
 		return
 	}
 
-	s.RLock()
-	defer s.RUnlock()
-	event := &Update{Point: point, Tile: tile}
+	s.Lock()
+	defer s.Unlock()
 	for _, sub := range s.subs {
-		sub.onUpdate(event)
+		sub.onUpdate(ev)
 	}
 }
 
 // Subscribe registers an event listener on a system
-func (s *signal) Subscribe(sub observer) {
+func (s *observers) Subscribe(sub observer) bool {
 	s.Lock()
 	defer s.Unlock()
 	s.subs = append(s.subs, sub)
+	return len(s.subs) == 1 // At least one
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (s *signal) Unsubscribe(sub observer) {
-	if s == nil {
-		return
-	}
-
+func (s *observers) Unsubscribe(sub observer) bool {
 	s.Lock()
 	defer s.Unlock()
 
@@ -151,4 +188,5 @@ func (s *signal) Unsubscribe(sub observer) {
 		}
 	}
 	s.subs = clean
+	return len(s.subs) == 0
 }

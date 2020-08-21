@@ -4,20 +4,20 @@
 package tile
 
 import (
-	"image"
-	"image/color"
-	//"sync"
+	"runtime"
+	"sync/atomic"
 )
 
 // Iterator represents an iterator function.
 type Iterator = func(Point, Tile)
-type pageFn = func(int16, int16, *page)
+type pageFn = func(*page)
 
 // Map represents a 2D tile map. Internally, a map is composed of 3x3 pages.
 type Map struct {
 	pages      [][]page // The pages of the map
 	pageWidth  int16    // The max page width
 	pageHeight int16    // The max page height
+	observers  pubsub   // The map of observers
 	Size       Point    // The map size
 }
 
@@ -28,12 +28,16 @@ func NewMap(width, height int16) *Map {
 	pages := make([][]page, height)
 	for x := int16(0); x < width; x++ {
 		pages[x] = make([]page, height)
+		for y := int16(0); y < height; y++ {
+			pages[x][y].point = At(x*3, y*3)
+		}
 	}
 
 	return &Map{
 		pages:      pages,
 		pageWidth:  width,
 		pageHeight: height,
+		observers:  pubsub{},
 		Size:       At(width*3, height*3),
 	}
 }
@@ -42,7 +46,7 @@ func NewMap(width, height int16) *Map {
 func (m *Map) Each(fn Iterator) {
 	for y := int16(0); y < m.pageHeight; y++ {
 		for x := int16(0); x < m.pageWidth; x++ {
-			m.pages[x][y].Each(x*3, y*3, fn)
+			m.pages[x][y].Each(fn)
 		}
 	}
 }
@@ -50,8 +54,8 @@ func (m *Map) Each(fn Iterator) {
 // Within selects the tiles within a specifid bounding box which is specified by
 // north-west and south-east coordinates.
 func (m *Map) Within(nw, se Point, fn Iterator) {
-	m.pagesWithin(nw, se, func(x, y int16, page *page) {
-		page.Each(x, y, func(p Point, tile Tile) {
+	m.pagesWithin(nw, se, func(page *page) {
+		page.Each(func(p Point, tile Tile) {
 			if p.Within(nw, se) {
 				fn(p, tile)
 			}
@@ -68,14 +72,14 @@ func (m *Map) pagesWithin(nw, se Point, fn pageFn) {
 
 	for x := nw.X / 3; x <= se.X/3; x++ {
 		for y := nw.Y / 3; y <= se.Y/3; y++ {
-			fn(x*3, y*3, &(m.pages[x][y]))
+			fn(&(m.pages[x][y]))
 		}
 	}
 }
 
 // At returns the tile at a specified position
 func (m *Map) At(x, y int16) (Tile, bool) {
-	if x < m.Size.X && y < m.Size.Y {
+	if x > 0 && y > 0 && x < m.Size.X && y < m.Size.Y {
 		return m.pages[x/3][y/3].Get(x, y), true
 	}
 
@@ -84,8 +88,13 @@ func (m *Map) At(x, y int16) (Tile, bool) {
 
 // UpdateAt updates the tile at a specific coordinate
 func (m *Map) UpdateAt(x, y int16, tile Tile) {
-	if x < m.Size.X && y < m.Size.Y {
-		m.pages[x/3][y/3].Set(x, y, tile)
+
+	// Update the tile in the map
+	if x > 0 && y > 0 && x < m.Size.X && y < m.Size.Y {
+		if m.pages[x/3][y/3].Set(x, y, tile) {
+			// Notify the observers, if any
+			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), tile)
+		}
 	}
 }
 
@@ -102,30 +111,22 @@ func (m *Map) Neighbors(x, y int16, fn Iterator) {
 
 	// Get the North
 	if y > 0 {
-		if tile := m.pages[nX][nY].Get(x, y-1); !tile.IsBlocked() {
-			fn(At(x, y-1), tile)
-		}
+		fn(At(x, y-1), m.pages[nX][nY].Get(x, y-1))
 	}
 
 	// Get the East
 	if eX < m.pageWidth {
-		if tile := m.pages[eX][eY].Get(x+1, y); !tile.IsBlocked() {
-			fn(At(x+1, y), tile)
-		}
+		fn(At(x+1, y), m.pages[eX][eY].Get(x+1, y))
 	}
 
 	// Get the South
 	if sY < m.pageHeight {
-		if tile := m.pages[sX][sY].Get(x, y+1); !tile.IsBlocked() {
-			fn(At(x, y+1), tile)
-		}
+		fn(At(x, y+1), m.pages[sX][sY].Get(x, y+1))
 	}
 
 	// Get the West
 	if x > 0 {
-		if tile := m.pages[wX][wY].Get(x-1, y); !tile.IsBlocked() {
-			fn(At(x-1, y), tile)
-		}
+		fn(At(x-1, y), m.pages[wX][wY].Get(x-1, y))
 	}
 }
 
@@ -147,100 +148,85 @@ func (m *Map) View(rect Rect, fn Iterator) *View {
 // https://www.redblobgames.com/pathfinding/a-star/introduction.html
 //}
 
-// draw converts the map to a black and white image for debugging purposes.
-func (m *Map) draw(rect Rect) image.Image {
-	if rect.Max.X == 0 || rect.Max.Y == 0 {
-		rect = NewRect(0, 0, m.Size.X, m.Size.Y)
-	}
-
-	size := rect.Size()
-	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
-	m.Within(rect.Min, rect.Max, func(p Point, tile Tile) {
-		a := uint8(255)
-		if tile.Flags.IsBlocked() {
-			a = 0
-		}
-
-		output.SetRGBA(int(p.X), int(p.Y), color.RGBA{a, a, a, 255})
-	})
-	return output
-}
-
 // -----------------------------------------------------------------------------
 
 // Tile represents a packed tile information, it must fit on 6 bytes.
-type Tile struct {
-	Flags         // The flags of the tile
-	Data  [5]byte // The data of the tile
-}
-
-// Flags represents a tile flags, used for pathfinding and such.
-type Flags byte
-
-// IsBlocked returns whether the tile is blocked or not
-func (f Flags) IsBlocked() bool {
-	return f&Blocked != 0
-}
-
-// Various tile flags
-const (
-	Blocked   Flags = 1 << iota // Whether the tile is impassable or not
-	Container                   // Whether the tile contains a container
-	Mobile                      // Whether the tile contains a mobile (player or NPC)
-	// Door ?
-	// Roof ?
-	// Status ?
-	// Object ?
-)
-
-//func Set(b, flag Flags) Flags    { return b | flag }
-//func Clear(b, flag Flags) Flags  { return b &^ flag }
-//func Toggle(b, flag Flags) Flags { return b ^ flag }
-//func Has(b, flag Flags) bool     { return b&flag != 0 }
+type Tile [6]byte
 
 // -----------------------------------------------------------------------------
 
 // page represents a 3x3 tile page each page should neatly fit on a cache
 // line and speed things up.
 type page struct {
-	//lock  sync.Mutex // Page lock for the page
-	event *signal // Page signals, 8 bytes
-	Tiles [9]Tile // Page tiles, 54 bytes
-	Flags uint16  // Page flags, 2 bytes
+	lock  int32   // Page spin-lock, 4 bytes
+	point Point   // Page X, Y coordinate, 4 bytes
+	flags uint16  // Page flags, 2 bytes
+	tiles [9]Tile // Page tiles, 54 bytes
 }
 
-// Get gets a tile at a specific coordinate.
-func (p *page) Get(x, y int16) Tile {
-	return p.Tiles[(y%3)*3+(x%3)]
+// Bounds returns the bounding box for the tile page.
+func (p *page) Bounds() Rect {
+	return Rect{p.point, At(p.point.X+3, p.point.Y+3)}
 }
 
 // Set updates the tile at a specific coordinate
-func (p *page) Set(x, y int16, tile Tile) {
-	p.Tiles[(y%3)*3+(x%3)] = tile
-	p.event.Notify(At(x, y), tile)
+func (p *page) Set(x, y int16, tile Tile) (observed bool) {
+	p.Lock()
+	p.tiles[(y%3)*3+(x%3)] = tile // Update the tile
+	observed = p.flags&1 != 0     // Are there any observers?
+	p.Unlock()
+	return
 }
 
-// UpdateEach iterates over all of the tiles in the page.
-func (p *page) Each(x, y int16, fn Iterator) {
-	i, mX, mY := 0, x+3, y+3
-	for ; x < mX; x++ {
-		for ; y < mY; y++ {
-			fn(At(x, y), p.Tiles[i])
-			i++
-		}
+// Get gets a tile at a specific coordinate.
+func (p *page) Get(x, y int16) (tile Tile) {
+	i := (y%3)*3 + (x % 3)
+	p.Lock()
+	tile = p.tiles[i]
+	p.Unlock()
+	return
+}
+
+// Each iterates over all of the tiles in the page.
+func (p *page) Each(fn Iterator) {
+	p.Lock()
+	tiles := p.tiles
+	p.Unlock()
+
+	x, y := p.point.X, p.point.Y
+	fn(Point{x, y}, tiles[0])         // NW
+	fn(Point{x + 1, y}, tiles[1])     // N
+	fn(Point{x + 2, y}, tiles[2])     // NE
+	fn(Point{x, y + 1}, tiles[3])     // W
+	fn(Point{x + 1, y + 1}, tiles[4]) // C
+	fn(Point{x + 2, y + 1}, tiles[5]) // E
+	fn(Point{x, y + 2}, tiles[6])     // SW
+	fn(Point{x + 1, y + 2}, tiles[7]) // S
+	fn(Point{x + 2, y + 2}, tiles[8]) // SE
+}
+
+// SetObserved sets the observed flag on the page
+func (p *page) SetObserved(observed bool) {
+	p.Lock()
+	defer p.Unlock()
+
+	if observed {
+		p.flags = p.flags | 1
+	} else {
+		p.flags = p.flags &^ 1
 	}
 }
 
-// Subscribe registers an event listener on a system
-func (p *page) Subscribe(sub observer) {
-	if p.event == nil {
-		p.event = newSignal()
+// Lock locks the spin lock. Note: this needs to be named Lock() so go vet will
+// complain if the page is copied around.
+func (p *page) Lock() {
+	for !atomic.CompareAndSwapInt32(&p.lock, 0, 1) {
+		runtime.Gosched()
 	}
-
-	p.event.Subscribe(sub)
 }
 
-// Unsubscribe deregisters an event listener from a system
-func (p *page) Unsubscribe(sub observer) {
-	p.event.Unsubscribe(sub)
+// Unlock unlocks the page. Note: this needs to be named Unlock() so go vet will
+// complain if the page is copied around.
+func (p *page) Unlock() {
+	atomic.StoreInt32(&p.lock, 0)
 }

@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Benchmark_Map/each-8         	     567	   2075837 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/neighbors-8    	36360330	        33.4 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Map/within-8       	   35290	     34146 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/each-8         	     278	   4255305 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/neighbors-8    	16901694	        70.9 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Map/within-8       	   20338	     58561 ns/op	       0 B/op	       0 allocs/op
 func Benchmark_Map(b *testing.B) {
-	var d [5]byte
+	var d [6]byte
 	defer assert.NotNil(b, d)
 	m := NewMap(900, 900)
 
@@ -23,7 +23,7 @@ func Benchmark_Map(b *testing.B) {
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
 			m.Each(func(_ Point, tile Tile) {
-				d = tile.Data // Pull data out
+				d = tile // Pull data out
 			})
 		}
 	})
@@ -33,7 +33,7 @@ func Benchmark_Map(b *testing.B) {
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
 			m.Neighbors(300, 300, func(_ Point, tile Tile) {
-				d = tile.Data // Pull data out
+				d = tile // Pull data out
 			})
 		}
 	})
@@ -43,7 +43,7 @@ func Benchmark_Map(b *testing.B) {
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
 			m.Within(At(100, 100), At(200, 200), func(p Point, tile Tile) {
-				d = tile.Data // Pull data out
+				d = tile // Pull data out
 			})
 		}
 	})
@@ -129,7 +129,7 @@ func TestNeighbors(t *testing.T) {
 	// Create a 9x9 map with labeled tiles
 	m := NewMap(9, 9)
 	m.Each(func(p Point, tile Tile) {
-		copy(tile.Data[:], p.String()[:3])
+		copy(tile[:], p.String()[:3])
 		m.UpdateAt(p.X, p.Y, tile)
 	})
 
@@ -137,7 +137,7 @@ func TestNeighbors(t *testing.T) {
 	for _, tc := range tests {
 		var out []string
 		m.Neighbors(tc.x, tc.y, func(_ Point, tile Tile) {
-			out = append(out, string(tile.Data[:3]))
+			out = append(out, string(tile[:3]))
 		})
 		assert.ElementsMatch(t, tc.expect, out)
 	}
@@ -148,13 +148,13 @@ func TestAt(t *testing.T) {
 	// Create a 9x9 map with labeled tiles
 	m := NewMap(9, 9)
 	m.Each(func(p Point, tile Tile) {
-		copy(tile.Data[:], p.String()[:3])
+		copy(tile[:], p.String()[:3])
 		m.UpdateAt(p.X, p.Y, tile)
 	})
 
 	// Make sure our At() and the position matches
 	m.Each(func(p Point, tile Tile) {
 		at, _ := m.At(p.X, p.Y)
-		assert.Equal(t, p.String(), string(at.Data[:3]))
+		assert.Equal(t, p.String(), string(at[:3]))
 	})
 }

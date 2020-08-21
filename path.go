@@ -3,6 +3,8 @@
 
 package tile
 
+type costFn = func(Tile) uint16
+
 // Edge represents an edge of the path
 type edge struct {
 	Point
@@ -10,7 +12,7 @@ type edge struct {
 }
 
 // Path calculates a short path and the distance between the two locations
-func (m *Map) Path(from, to Point) ([]Point, int, bool) {
+func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 	frontier := newHeap32()
 	frontier.Push(from.Integer(), 0)
 
@@ -40,9 +42,14 @@ func (m *Map) Path(from, to Point) ([]Point, int, bool) {
 		}
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, _ Tile) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile) {
+			cNext := costOf(nextTile)
+			if cNext == 0 {
+				return // Blocked tile, ignore completely
+			}
+
 			pNext := next.Integer()
-			newCost := edges[pCurr].Cost + 1 // cost(current, next)
+			newCost := edges[pCurr].Cost + uint32(cNext) // cost(current, next)
 
 			if e, ok := edges[pNext]; !ok || newCost < e.Cost {
 				priority := newCost + next.ManhattanDistance(to) // heuristic
