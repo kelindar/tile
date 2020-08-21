@@ -11,13 +11,51 @@ type edge struct {
 	Cost uint32
 }
 
+// Around performs a breadth first search around a point.
+func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
+	start, ok := m.At(from.X, from.Y)
+	if !ok {
+		return
+	}
+
+	fn(from, start)
+	frontier := newHeap32()
+	frontier.Push(from.Integer(), 0)
+	reached := make(map[uint32]struct{}, distance*distance) // TODO: too much here
+	reached[from.Integer()] = struct{}{}
+
+	for !frontier.IsEmpty() {
+		pCurr, _ := frontier.Pop()
+		current := unpackPoint(pCurr)
+
+		// Get all of the neighbors
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile) {
+			if d := from.DistanceTo(next); d > distance {
+				return // Too far
+			}
+
+			if cost := costOf(nextTile); cost == 0 {
+				return // Blocked tile, ignore completely
+			}
+
+			// Add to the search queue
+			pNext := next.Integer()
+			if _, ok := reached[pNext]; !ok {
+				frontier.Push(pNext, 1)
+				reached[pNext] = struct{}{}
+				fn(next, nextTile)
+			}
+		})
+	}
+}
+
 // Path calculates a short path and the distance between the two locations
 func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 	frontier := newHeap32()
 	frontier.Push(from.Integer(), 0)
 
 	// Add the first edge
-	capacity := int(float32(from.ManhattanDistance(to)) * 1.5)
+	capacity := int(float32(from.DistanceTo(to)) * 1.5)
 	edges := make(map[uint32]edge, capacity)
 	edges[from.Integer()] = edge{
 		Point: from,
@@ -52,7 +90,7 @@ func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 			newCost := edges[pCurr].Cost + uint32(cNext) // cost(current, next)
 
 			if e, ok := edges[pNext]; !ok || newCost < e.Cost {
-				priority := newCost + next.ManhattanDistance(to) // heuristic
+				priority := newCost + next.DistanceTo(to) // heuristic
 				frontier.Push(next.Integer(), priority)
 
 				edges[pNext] = edge{

@@ -52,9 +52,9 @@ func TestDraw(t *testing.T) {
 	assert.NoError(t, f.Close())*/
 }
 
-// Benchmark_Path/9x9-8         	  342571	      3342 ns/op	     712 B/op	       4 allocs/op
-// Benchmark_Path/300x300-8     	     579	   2098446 ns/op	  532455 B/op	     255 allocs/op
-func Benchmark_Path(b *testing.B) {
+// BenchmarkPath/9x9-8         	  342571	      3342 ns/op	     712 B/op	       4 allocs/op
+// BenchmarkPath/300x300-8     	     579	   2098446 ns/op	  532455 B/op	     255 allocs/op
+func BenchmarkPath(b *testing.B) {
 	b.Run("9x9", func(b *testing.B) {
 		m := mapFrom("9x9.png")
 		b.ReportAllocs()
@@ -72,6 +72,49 @@ func Benchmark_Path(b *testing.B) {
 			m.Path(At(115, 20), At(160, 270), costOf)
 		}
 	})
+}
+
+// BenchmarkAround/3r-8         	  307948	      3767 ns/op	     500 B/op	       5 allocs/op
+// BenchmarkAround/5r-8         	  141174	      8472 ns/op	     921 B/op	      10 allocs/op
+// BenchmarkAround/10r-8        	   54306	     22097 ns/op	    3788 B/op	      12 allocs/op
+func BenchmarkAround(b *testing.B) {
+	m := mapFrom("300x300.png")
+	b.Run("3r", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Tile) {})
+		}
+	})
+
+	b.Run("5r", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Tile) {})
+		}
+	})
+
+	b.Run("10r", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Tile) {})
+		}
+	})
+}
+
+func TestAround(t *testing.T) {
+	m := mapFrom("9x9.png")
+	var path []string
+	m.Around(At(2, 2), 3, costOf, func(p Point, tile Tile) {
+		path = append(path, p.String())
+	})
+	assert.Equal(t, 10, len(path))
+	assert.ElementsMatch(t, []string{
+		"2,2", "2,1", "2,3", "1,2", "3,1",
+		"1,1", "1,3", "3,3", "4,3", "3,4",
+	}, path)
 }
 
 // BenchmarkHeap-8   	   94454	     12303 ns/op	    3968 B/op	       5 allocs/op

@@ -87,8 +87,8 @@ func (p Point) WithinSize(size Point) bool {
 	return p.X >= 0 && p.Y >= 0 && p.X < size.X && p.Y < size.Y
 }
 
-// ManhattanDistance calculates manhattan distance to the other point
-func (p Point) ManhattanDistance(other Point) uint32 {
+// DistanceTo calculates manhattan distance to the other point
+func (p Point) DistanceTo(other Point) uint32 {
 	return abs(int32(p.X)-int32(other.X)) + abs(int32(p.Y)-int32(other.Y))
 }
 
