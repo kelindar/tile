@@ -106,6 +106,12 @@ In the example below we create a new 20x20 view on the grid and iterate through 
 view := grid.View(NewRect(0, 0, 20, 20), func(p Point, tile Tile){
     // Optional, all of the tiles that are in the view now
 })
+
+// Poll the inbox (in reality this would need to be with a select, and a goroutine)
+for {
+    update := <-view.Inbox
+    // Do something with update.Point, update.Tile
+}
 ```
 
 The `MoveBy()` method allows you to move the view in a specific direction. It takes in a `x,y` vector but it can contain negative values. In the example below, we move the view upwards by 5 tiles. In addition, we can also provide an iterator and do something with all of the tiles that have entered the view (e.g. show them to the player).
