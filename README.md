@@ -18,13 +18,13 @@ The main entry in this library is `Grid` which represents, as the name implies a
 
 In order to create a new `Grid`, you first need to call `NewGrid()` method which pre-allocates the required space and initializes the tile grid itself. For example, you can create a 1000x1000 grid as shown below.
 
-```
+```go
 grid := NewGrid(1000, 1000)
 ```
 
 The `Each()` method of the grid allows you to iterate through all of the tiles in the grid. It takes an iterator function which is then invoked on every tile.
 
-```
+```go
 grid.Each(func(p Point, tile Tile) {
     // ...
 })
@@ -32,7 +32,7 @@ grid.Each(func(p Point, tile Tile) {
 
 The `Within()` method of the grid allows you to iterate through a set of tiles within a bounding box, specified by the top-left and bottom-right points. It also takes an iterator function which is then invoked on every tile matching the filter.
 
-```
+```go
 grid.Within(At(1, 1), At(5, 5), func(p Point, tile Tile) {
     // ...
 })
@@ -40,7 +40,7 @@ grid.Within(At(1, 1), At(5, 5), func(p Point, tile Tile) {
 
 The `At()` method of the grid allows you to retrieve a tile at a specific `x,y` coordinate. It simply returns the tile and whether it was found in the grid or not.
 
-```
+```go
 if tile, ok := grid.At(50, 100); ok {
     // ...
 }
@@ -48,13 +48,13 @@ if tile, ok := grid.At(50, 100); ok {
 
 The `UpdateAt()` method of the grid allows you to update a tile at a specific `x,y` coordinate. Since the `Grid` itself is thread-safe, this is the way to (a) make sure the tile update/read is not racing and (b) notify observers of a tile update (more about this below).
 
-```
+```go
 grid.UpdateAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
 ```
 
 The `Neighbors()` method of the grid allows you to get the direct neighbors at a particular `x,y` coordinate and it takes an iterator funcion which is called for each neighbor. In this implementation, we are only taking direct neighbors (top, left, bottom, right). You rarely will need to use this method, unless you are rolling out your own pathfinding algorithm.
 
-```
+```go
 grid.UpdateAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
 ```
 
@@ -64,7 +64,7 @@ As mentioned in the introduction, this library provides a few grid search / path
 
 The `Path()` method is used for finding a way between 2 points, you provide it the from/to point as well as costing function and it returns the path, calculated cost and whether a path was found or not. Note of caution however, avoid running it between 2 points if no path exists, since it might need to scan the entire map to figure that out with the current implementation.
 
-```
+```go
 from := At(1, 1)
 goal := At(7, 7)
 path, distance, found := m.Path(from, goal, func(t Tile) uint16{
@@ -77,7 +77,7 @@ path, distance, found := m.Path(from, goal, func(t Tile) uint16{
 
 The `Around()` method provides you with the ability to do a breadth-first search around a point, by providing a limit distance for the search as well as a cost function and an iterator. This is a handy way of finding things that are around the player in your game.
 
-```
+```go
 point  := At(50, 50)
 radius := 5
 m.Around(point, radius, func(t Tile) uint16{
@@ -98,7 +98,7 @@ In order to use these observers, you need to first call the `View()` method and 
 
 In the example below we create a new 20x20 view on the grid and iterate through all of the tiles in the view.
 
-```
+```go
 view := grid.View(NewRect(0, 0, 20, 20), func(p Point, tile Tile){
     // Optional, all of the tiles that are in the view now
 })
@@ -106,7 +106,7 @@ view := grid.View(NewRect(0, 0, 20, 20), func(p Point, tile Tile){
 
 The `MoveBy()` method allows you to move the view in a specific direction. It takes in a `x,y` vector but it can contain negative values. In the example below, we move the view upwards by 5 tiles. In addition, we can also provide an iterator and do something with all of the tiles that have entered the view (e.g. show them to the player).
 
-```
+```go
 view.MoveBy(0, 5, func(p Point, tile Tile){
     // Every tile which entered our view   
 })
@@ -114,7 +114,7 @@ view.MoveBy(0, 5, func(p Point, tile Tile){
 
 Similarly, `MoveAt()` method allows you to move the view at a specific location provided by the coordinates. The size of the view stays the same and the iterator will be called for all of the new tiles that have entered the view port.
 
-```
+```go
 view.MoveAt(At(10, 10), func(p Point, tile Tile){
     // Every tile which entered our view   
 })
@@ -122,7 +122,7 @@ view.MoveAt(At(10, 10), func(p Point, tile Tile){
 
 The `Resize()` method allows you to resize and update the view port. As usual, the iterator will be called for all of the new tiles that have entered the view port.
 
-```
+```go
 viewRect := NewRect(10, 10, 30, 30)
 view.Resize(viewRect, func(p Point, tile Tile){
     // Every tile which entered our view   
@@ -131,7 +131,7 @@ view.Resize(viewRect, func(p Point, tile Tile){
 
 The `Close()` method should be called when you are done with the view, since it unsubscribes all of the notifications. Be careful, if you do not close the view when you are done with it, it will lead to memory leaks since it will continue to observe the grid and receive notifications.
 
-```
+```go
 // Unsubscribe from notifications and close the view
 view.Close()
 ```
