@@ -150,31 +150,11 @@ func mapFrom(name string) *Map {
 			switch v.R {
 			case 255:
 			case 0:
-				m.UpdateAt(x, y, Tile{1, 0, 0, 0, 0, 0})
+				m.UpdateAt(x, y, Tile{0xff, 0, 0, 0, 0, 0})
 			}
 		}
 	}
 	return m
-
-	/*m := NewMap(int16(height), int16(width))
-	var y int16
-	for _, row := range strings.Split(str, "\n") {
-		row = strings.TrimSpace(row)
-		if len(row) != width {
-			continue
-		}
-
-		for x, cell := range row {
-			if cell == '.' {
-				m.UpdateAt(int16(x), int16(y), Tile{
-					Flags: Blocked,
-				})
-			}
-		}
-
-		y++
-	}
-	return m*/
 }
 
 // plotPath plots the path on ASCII map

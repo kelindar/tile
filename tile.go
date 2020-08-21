@@ -79,7 +79,7 @@ func (m *Map) pagesWithin(nw, se Point, fn pageFn) {
 
 // At returns the tile at a specified position
 func (m *Map) At(x, y int16) (Tile, bool) {
-	if x > 0 && y > 0 && x < m.Size.X && y < m.Size.Y {
+	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
 		return m.pages[x/3][y/3].Get(x, y), true
 	}
 
@@ -90,7 +90,7 @@ func (m *Map) At(x, y int16) (Tile, bool) {
 func (m *Map) UpdateAt(x, y int16, tile Tile) {
 
 	// Update the tile in the map
-	if x > 0 && y > 0 && x < m.Size.X && y < m.Size.Y {
+	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
 		if m.pages[x/3][y/3].Set(x, y, tile) {
 			// Notify the observers, if any
 			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), tile)

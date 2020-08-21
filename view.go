@@ -90,12 +90,9 @@ func (v *View) UpdateAt(x, y int16, tile Tile) {
 
 // onUpdate occurs when a tile has updated.
 func (v *View) onUpdate(ev *Update) {
-	if !v.rect.Contains(ev.Point) {
-		return // Point is outside of the view
+	if v.rect.Contains(ev.Point) {
+		v.Inbox <- *ev // (copy)
 	}
-
-	// Push the update to the buffered channel
-	v.Inbox <- *ev // (copy)
 }
 
 // -----------------------------------------------------------------------------
