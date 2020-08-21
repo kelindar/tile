@@ -23,17 +23,16 @@ func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 		return
 	}
 
-	// For pre-allocating, we use πr2 since BFS will result in a approximation
-	// of a circle, in the worst case.
-	maxArea := int(math.Ceil(math.Pi * float64(distance*distance))) // Circle area
-	//	maxFrontier := int(math.Ceil(2 * math.Pi * float64(distance)))  // Circle circumference
-
 	fn(from, start)
-	//frontier := newHeap32(maxFrontier)
+
+	// Acquire a frontier heap for search
 	frontier := acquireHeap()
 	frontier.Push(from.Integer(), 0)
 	defer releaseHeap(frontier)
 
+	// For pre-allocating, we use πr2 since BFS will result in a approximation
+	// of a circle, in the worst case.
+	maxArea := int(math.Ceil(math.Pi * float64(distance*distance)))
 	reached := make(map[uint32]struct{}, maxArea)
 	reached[from.Integer()] = struct{}{}
 
@@ -64,16 +63,16 @@ func (m *Map) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 
 // Path calculates a short path and the distance between the two locations
 func (m *Map) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
-	distance := float64(from.DistanceTo(to))
-	maxArea := int(math.Ceil(math.Pi * distance * distance)) // Circle area
-	//maxFrontier := int(math.Ceil(2 * math.Pi * distance))    // Circle circumference
 
-	//frontier := newHeap32(maxFrontier)
+	// Acquire a frontier heap for search
 	frontier := acquireHeap()
 	frontier.Push(from.Integer(), 0)
 	defer releaseHeap(frontier)
 
-	// Add the first edge
+	// For pre-allocating, we use πr2 since BFS will result in a approximation
+	// of a circle, in the worst case.
+	distance := float64(from.DistanceTo(to))
+	maxArea := int(math.Ceil(math.Pi * float64(distance*distance)))
 	edges := make(map[uint32]edge, maxArea)
 	edges[from.Integer()] = edge{
 		Point: from,
