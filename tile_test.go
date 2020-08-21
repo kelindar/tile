@@ -61,7 +61,7 @@ func TestWithin(t *testing.T) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 25, len(path))
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"1,1", "2,1", "1,2", "2,2", "3,1",
 		"4,1", "5,1", "3,2", "4,2", "5,2",
 		"1,3", "2,3", "1,4", "2,4", "1,5",
@@ -78,7 +78,7 @@ func TestWithinCorner(t *testing.T) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 6, len(path))
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"7,6", "8,6", "7,7",
 		"8,7", "7,8", "8,8",
 	}, path)
@@ -101,14 +101,17 @@ func TestEach(t *testing.T) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 81, len(path))
-	assert.Equal(t, []string{
-		"0,0", "1,0", "2,0",
-		"0,1", "1,1", "2,1",
-		"0,2", "1,2", "2,2",
-		"3,0", "4,0", "5,0",
-		"3,1", "4,1", "5,1",
-		"3,2", "4,2", "5,2",
-	}, path[:18])
+	assert.ElementsMatch(t, []string{
+		"0,0", "1,0", "2,0", "0,1", "1,1", "2,1", "0,2", "1,2", "2,2",
+		"0,3", "1,3", "2,3", "0,4", "1,4", "2,4", "0,5", "1,5", "2,5",
+		"0,6", "1,6", "2,6", "0,7", "1,7", "2,7", "0,8", "1,8", "2,8",
+		"3,0", "4,0", "5,0", "3,1", "4,1", "5,1", "3,2", "4,2", "5,2",
+		"3,3", "4,3", "5,3", "3,4", "4,4", "5,4", "3,5", "4,5", "5,5",
+		"3,6", "4,6", "5,6", "3,7", "4,7", "5,7", "3,8", "4,8", "5,8",
+		"6,0", "7,0", "8,0", "6,1", "7,1", "8,1", "6,2", "7,2", "8,2",
+		"6,3", "7,3", "8,3", "6,4", "7,4", "8,4", "6,5", "7,5", "8,5",
+		"6,6", "7,6", "8,6", "6,7", "7,7", "8,7", "6,8", "7,8", "8,8",
+	}, path)
 }
 
 func TestNeighbors(t *testing.T) {
@@ -136,7 +139,7 @@ func TestNeighbors(t *testing.T) {
 		m.Neighbors(tc.x, tc.y, func(_ Point, tile Tile) {
 			out = append(out, string(tile.Data[:3]))
 		})
-		assert.Equal(t, tc.expect, out)
+		assert.ElementsMatch(t, tc.expect, out)
 	}
 }
 

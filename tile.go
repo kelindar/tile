@@ -65,8 +65,8 @@ func (m *Map) pagesWithin(nw, se Point, fn pageFn) {
 		se = At(m.Size.X-1, m.Size.Y-1)
 	}
 
-	for y := nw.Y / 3; y <= se.Y/3; y++ {
-		for x := nw.X / 3; x <= se.X/3; x++ {
+	for x := nw.X / 3; x <= se.X/3; x++ {
+		for y := nw.Y / 3; y <= se.Y/3; y++ {
 			fn(x*3, y*3, &(m.pages[x][y]))
 		}
 	}
