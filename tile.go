@@ -143,11 +143,6 @@ func (m *Map) View(rect Rect, fn Iterator) *View {
 	return view
 }
 
-//func (m *Map) Around(x, y, distance int16, fn Iterator) {
-// BFS
-// https://www.redblobgames.com/pathfinding/a-star/introduction.html
-//}
-
 // -----------------------------------------------------------------------------
 
 // Tile represents a packed tile information, it must fit on 6 bytes.
