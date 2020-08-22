@@ -67,7 +67,7 @@ func TestSaveLoadFlate(t *testing.T) {
 	assert.NoError(t, writer.Close())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(540008), n)
-	assert.Equal(t, int64(18299), output.Len())
+	assert.Equal(t, int(18299), output.Len())
 
 	// Load the map back
 	reader := flate.NewReader(output)
