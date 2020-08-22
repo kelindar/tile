@@ -146,6 +146,41 @@ The `Close()` method should be called when you are done with the view, since it 
 view.Close()
 ```
 
+# Save & Load
+
+The library also provides a way to save the `Grid` to an `io.Writer` and load it from an `io.Reader` by using `WriteTo()` method and `ReadFrom()` function. Keep in mind that the save/load mechanism does not do any compression, but in practice you should [use to a compressor](https://github.com/klauspost/compress) if you want your maps to not take too much of the disk space - snappy is a good option for this since it's fast and compresses relatively well. 
+
+The `WriteTo()` method of the grid only requires a specific `io.Writer` to be passed and returns a number of bytes that have been written down to it as well if any specific error has occured. Below is an example of how to save the grid into a compressed buffer.
+
+```go
+// Prepare the output buffer and compressor
+output := new(bytes.Buffer)
+writer, err := flate.NewWriter(output, flate.BestSpeed)
+if err != nil {
+    // ...
+}
+
+defer writer.Close()            // Make sure we flush the compressor
+_, err := grid.WriteTo(writer)  // Write the grid
+if err != nil {
+    // ...
+}
+```
+
+The `ReadFrom()` function allows you to read the `Grid` from a particular reader. To complement the example above, the one below shows how to read a compressed grid using this function.
+
+```go
+// Prepare a compressed reader over the buffer
+reader := flate.NewReader(output)
+
+// Read the Grid
+grid, err := ReadFrom(reader)
+if err != nil{
+    // ...
+}
+```
+
+
 # Contributing
 
 We are open to contributions, feel free to submit a pull request and we'll review it as quickly as we can. This library is maintained by [Roman Atachiants](https://www.linkedin.com/in/atachiants/)

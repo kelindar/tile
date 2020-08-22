@@ -4,8 +4,10 @@
 package tile
 
 import (
+	"reflect"
 	"runtime"
 	"sync/atomic"
+	"unsafe"
 )
 
 // Iterator represents an iterator function.
@@ -154,8 +156,8 @@ type Tile [6]byte
 // line and speed things up.
 type page struct {
 	lock  int32   // Page spin-lock, 4 bytes
-	point Point   // Page X, Y coordinate, 4 bytes
 	flags uint16  // Page flags, 2 bytes
+	point Point   // Page X, Y coordinate, 4 bytes
 	tiles [9]Tile // Page tiles, 54 bytes
 }
 
@@ -224,4 +226,13 @@ func (p *page) Lock() {
 // complain if the page is copied around.
 func (p *page) Unlock() {
 	atomic.StoreInt32(&p.lock, 0)
+}
+
+// Data returns a buffer to the tile data, without allocations.
+func (p *page) Data() []byte {
+	var out reflect.SliceHeader
+	out.Data = reflect.ValueOf(&p.tiles).Pointer()
+	out.Len = tileDataSize
+	out.Cap = tileDataSize
+	return *(*[]byte)(unsafe.Pointer(&out))
 }
