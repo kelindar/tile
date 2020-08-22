@@ -180,6 +180,27 @@ if err != nil{
 }
 ```
 
+# Benchmarks
+
+This library contains quite a bit of various micro-benchmarks to make sure that everything stays pretty fast. Feel free to clone and play around with them yourself. Below are the benchmarks which we have, most of them are running on relatively large grids.
+
+```
+goarch: amd64
+pkg: github.com/kelindar/tile
+Benchmark_Grid/each-8         	     327	   3636155 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Grid/neighbors-8    	16902478	        69.6 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Grid/within-8       	   21237	     56224 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPath/9x9-8           	  210522	      5256 ns/op	   16468 B/op	       3 allocs/op
+BenchmarkPath/300x300-8       	     489	   2446567 ns/op	 7801130 B/op	       4 allocs/op
+BenchmarkAround/3r-8          	  363295	      3243 ns/op	     385 B/op	       1 allocs/op
+BenchmarkAround/5r-8          	  164382	      7288 ns/op	     931 B/op	       2 allocs/op
+BenchmarkAround/10r-8         	   64854	     18749 ns/op	    3489 B/op	       2 allocs/op
+BenchmarkHeap-8               	  101647	     11806 ns/op	    3968 B/op	       5 allocs/op
+BenchmarkStore/save-8         	    7987	    148116 ns/op	       8 B/op	       1 allocs/op
+BenchmarkStore/read-8         	    3411	    347572 ns/op	  659881 B/op	     107 allocs/op
+BenchmarkView/update-8        	10619600	       110 ns/op	      16 B/op	       1 allocs/op
+BenchmarkView/move-8          	    7488	    153847 ns/op	       0 B/op	       0 allocs/op
+```
 
 # Contributing
 
