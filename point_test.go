@@ -31,6 +31,15 @@ func TestPoint(t *testing.T) {
 	assert.True(t, p.WithinSize(At(20, 30)))
 }
 
+func TestMorton(t *testing.T) {
+	p := At(8191, 8191)
+	assert.Equal(t, 67108863, int(p.Interleave()))
+	assert.Equal(t, p, deinterleavePoint(67108863))
+}
+
+// BenchmarkPoint/within-8         	1000000000	         0.220 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkPoint/within-rect-8    	1000000000	         0.219 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkPoint/interleave-8     	1000000000	         0.657 ns/op	       0 B/op	       0 allocs/op
 func BenchmarkPoint(b *testing.B) {
 	p := At(10, 20)
 	b.Run("within", func(b *testing.B) {
@@ -47,5 +56,16 @@ func BenchmarkPoint(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			p.WithinRect(NewRect(0, 0, 100, 100))
 		}
+	})
+
+	b.Run("interleave", func(b *testing.B) {
+		out := int32(0)
+		p := At(8191, 8191)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			out = p.Interleave()
+		}
+		assert.NotZero(b, out)
 	})
 }

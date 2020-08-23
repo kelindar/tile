@@ -31,29 +31,32 @@ func TestPath(t *testing.T) {
 	assert.True(t, found)
 }
 
-/*func TestPath2(t *testing.T) {
-	m := mapFrom("300x300.png")
-	path, dist, found := m.Path(At(115, 20), At(160, 270))
-	assert.Equal(t, ``, plotPath(m, path))
-	ioutil.WriteFile("path.txt", []byte(plotPath(m, path)), os.ModePerm)
-	assert.Equal(t, 12, dist)
+func TestPathTiny(t *testing.T) {
+	m := NewGrid(6, 6)
+	path, dist, found := m.Path(At(0, 0), At(5, 5), costOf)
+	assert.Equal(t, `
+ x    
+ x    
+ x    
+ x    
+ x    
+ xxxx `, plotPath(m, path))
+	assert.Equal(t, 10, dist)
 	assert.True(t, found)
-}*/
+}
 
 func TestDraw(t *testing.T) {
 	m := mapFrom("9x9.png")
 	out := drawGrid(m, NewRect(0, 0, 0, 0))
 	assert.NotNil(t, out)
-	/*f, err := os.Create("image.png")
-	defer f.Close()
-
-	assert.NoError(t, err)
-	assert.NoError(t, png.Encode(f, out))
-	assert.NoError(t, f.Close())*/
 }
 
-// BenchmarkPath/9x9-8         	  203390	      5439 ns/op	   16468 B/op	       3 allocs/op
-// BenchmarkPath/300x300-8     	     417	   2544436 ns/op	 7801171 B/op	       4 allocs/op
+// BenchmarkPath/9x9-8         	  210472	      5316 ns/op	   16468 B/op	       3 allocs/op
+// BenchmarkPath/300x300-8     	     463	   2546373 ns/op	 7801135 B/op	       4 allocs/op
+// BenchmarkPath/381x381-8     	     373	   2732657 ns/op	62394362 B/op	       4 allocs/op
+// BenchmarkPath/384x384-8     	     153	   7791925 ns/op	62396304 B/op	       5 allocs/op
+// BenchmarkPath/6144x6144-8   	     158	   7468206 ns/op	62395377 B/op	       3 allocs/op
+// BenchmarkPath/6147x6147-8   	     160	   7468716 ns/op	62395359 B/op	       3 allocs/op
 func BenchmarkPath(b *testing.B) {
 	b.Run("9x9", func(b *testing.B) {
 		m := mapFrom("9x9.png")
@@ -72,6 +75,43 @@ func BenchmarkPath(b *testing.B) {
 			m.Path(At(115, 20), At(160, 270), costOf)
 		}
 	})
+
+	b.Run("381x381", func(b *testing.B) {
+		m := NewGrid(381, 381)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(0, 0), At(380, 380), costOf)
+		}
+	})
+
+	b.Run("384x384", func(b *testing.B) {
+		m := NewGrid(384, 384)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(0, 0), At(380, 380), costOf)
+		}
+	})
+
+	b.Run("6144x6144", func(b *testing.B) {
+		m := NewGrid(6144, 6144)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(0, 0), At(380, 380), costOf)
+		}
+	})
+
+	b.Run("6147x6147", func(b *testing.B) {
+		m := NewGrid(6147, 6147)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(0, 0), At(380, 380), costOf)
+		}
+	})
+
 }
 
 // BenchmarkAround/3r-8         	  352876	      3355 ns/op	     385 B/op	       1 allocs/op
@@ -198,6 +238,7 @@ func mapFrom(name string) *Grid {
 			case 0:
 				m.UpdateAt(x, y, Tile{0xff, 0, 0, 0, 0, 0})
 			}
+
 		}
 	}
 	return m
@@ -211,6 +252,7 @@ func plotPath(m *Grid, path []Point) string {
 	}
 
 	m.Each(func(l Point, tile Tile) {
+		//println(l.String(), int(tile[0]))
 		switch {
 		case pointInPath(l, path):
 			out[l.Y][l.X] = 'x'

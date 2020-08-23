@@ -13,43 +13,66 @@ import (
 // Iterator represents an iterator function.
 type Iterator = func(Point, Tile)
 type pageFn = func(*page)
+type indexFn = func(x, y int16) int
+type pointFn = func(i int) Point
 
 // Grid represents a 2D tile map. Internally, a map is composed of 3x3 pages.
 type Grid struct {
-	pages      [][]page // The pages of the map
-	pageWidth  int16    // The max page width
-	pageHeight int16    // The max page height
-	observers  pubsub   // The map of observers
-	Size       Point    // The map size
+	pages      []page  // The pages of the map
+	pageWidth  int16   // The max page width
+	pageHeight int16   // The max page height
+	observers  pubsub  // The map of observers
+	Size       Point   // The map size
+	indexOf    indexFn // The page index function
 }
 
 // NewGrid returns a new map of the specified size. The width and height must be both
 // multiples of 3.
 func NewGrid(width, height int16) *Grid {
 	width, height = width/3, height/3
-	pages := make([][]page, height)
-	for x := int16(0); x < width; x++ {
-		pages[x] = make([]page, height)
-		for y := int16(0); y < height; y++ {
-			pages[x][y].point = At(x*3, y*3)
-		}
-	}
 
-	return &Grid{
+	max := int32(width) * int32(height)
+	pages := make([]page, max)
+	m := &Grid{
 		pages:      pages,
 		pageWidth:  width,
 		pageHeight: height,
 		observers:  pubsub{},
 		Size:       At(width*3, height*3),
 	}
+
+	// Function to calculate a point based on the index
+	var pointAt func(i int) Point = func(i int) Point {
+		return At(int16(i%int(width)), int16(i/int(width)))
+	}
+	m.indexOf = m.pointToFlat
+
+	// If the map is square and page count is a power of 2, use z-curve filling instead
+	// as this will speed up data access under certain conditions.
+	if width == height && (width&(width-1)) == 0 {
+		pointAt = deinterleavePoint
+		m.indexOf = m.pointToZ
+	}
+
+	for i := 0; i < int(max); i++ {
+		pages[i].point = pointAt(i).MultiplyScalar(3)
+	}
+	return m
+}
+
+func (m *Grid) pointToFlat(x, y int16) int {
+	return int(x) + int(m.pageWidth)*int(y)
+}
+
+func (m *Grid) pointToZ(x, y int16) int {
+	return int(At(x, y).Interleave())
 }
 
 // Each iterates over all of the tiles in the map.
 func (m *Grid) Each(fn Iterator) {
-	for y := int16(0); y < m.pageHeight; y++ {
-		for x := int16(0); x < m.pageWidth; x++ {
-			m.pages[x][y].Each(fn)
-		}
+	until := int(m.pageHeight) * int(m.pageWidth)
+	for i := 0; i < until; i++ {
+		m.pages[i].Each(fn)
 	}
 }
 
@@ -74,7 +97,7 @@ func (m *Grid) pagesWithin(nw, se Point, fn pageFn) {
 
 	for x := nw.X / 3; x <= se.X/3; x++ {
 		for y := nw.Y / 3; y <= se.Y/3; y++ {
-			fn(&(m.pages[x][y]))
+			fn(&m.pages[m.indexOf(x, y)])
 		}
 	}
 }
@@ -82,7 +105,7 @@ func (m *Grid) pagesWithin(nw, se Point, fn pageFn) {
 // At returns the tile at a specified position
 func (m *Grid) At(x, y int16) (Tile, bool) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		return m.pages[x/3][y/3].Get(x, y), true
+		return m.pages[m.indexOf(x/3, y/3)].Get(x, y), true
 	}
 
 	return Tile{}, false
@@ -93,7 +116,7 @@ func (m *Grid) UpdateAt(x, y int16, tile Tile) {
 
 	// Update the tile in the map
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		if m.pages[x/3][y/3].Set(x, y, tile) {
+		if m.pages[m.indexOf(x/3, y/3)].Set(x, y, tile) {
 			// Notify the observers, if any
 			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), tile)
 		}
@@ -113,22 +136,22 @@ func (m *Grid) Neighbors(x, y int16, fn Iterator) {
 
 	// Get the North
 	if y > 0 {
-		fn(At(x, y-1), m.pages[nX][nY].Get(x, y-1))
+		fn(At(x, y-1), m.pages[m.indexOf(nX, nY)].Get(x, y-1))
 	}
 
 	// Get the East
 	if eX < m.pageWidth {
-		fn(At(x+1, y), m.pages[eX][eY].Get(x+1, y))
+		fn(At(x+1, y), m.pages[m.indexOf(eX, eY)].Get(x+1, y))
 	}
 
 	// Get the South
 	if sY < m.pageHeight {
-		fn(At(x, y+1), m.pages[sX][sY].Get(x, y+1))
+		fn(At(x, y+1), m.pages[m.indexOf(sX, sY)].Get(x, y+1))
 	}
 
 	// Get the West
 	if x > 0 {
-		fn(At(x-1, y), m.pages[wX][wY].Get(x-1, y))
+		fn(At(x-1, y), m.pages[m.indexOf(wX, wY)].Get(x-1, y))
 	}
 }
 

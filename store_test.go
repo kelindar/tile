@@ -52,7 +52,7 @@ func TestSaveLoad(t *testing.T) {
 	// Load the map back
 	out, err := ReadFrom(enc)
 	assert.NoError(t, err)
-	assert.Equal(t, m, out)
+	assert.Equal(t, m.pages, out.pages)
 }
 
 func TestSaveLoadFlate(t *testing.T) {
@@ -73,5 +73,5 @@ func TestSaveLoadFlate(t *testing.T) {
 	reader := flate.NewReader(output)
 	out, err := ReadFrom(reader)
 	assert.NoError(t, err)
-	assert.Equal(t, m, out)
+	assert.Equal(t, m.pages, out.pages)
 }

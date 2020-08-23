@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Benchmark_Grid/each-8         	     278	   4255305 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Grid/neighbors-8    	16901694	        70.9 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Grid/within-8       	   20338	     58561 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Grid/each-8         	     507	   2430008 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Grid/neighbors-8    	15184356	        79.3 ns/op	       0 B/op	       0 allocs/op
+// Benchmark_Grid/within-8       	   26259	     45356 ns/op	       0 B/op	       0 allocs/op
 func Benchmark_Grid(b *testing.B) {
 	var d [6]byte
 	defer assert.NotNil(b, d)
-	m := NewGrid(900, 900)
+	m := NewGrid(768, 768)
 
 	b.Run("each", func(b *testing.B) {
 		b.ReportAllocs()
@@ -157,4 +157,12 @@ func TestAt(t *testing.T) {
 		at, _ := m.At(p.X, p.Y)
 		assert.Equal(t, p.String(), string(at[:3]))
 	})
+
+	// Make sure that points match
+	for y := int16(0); y < 9; y++ {
+		for x := int16(0); x < 9; x++ {
+			at, _ := m.At(x, y)
+			assert.Equal(t, At(x, y).String(), string(at[:3]))
+		}
+	}
 }
