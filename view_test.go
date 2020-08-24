@@ -16,11 +16,11 @@ func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
 	v := m.View(NewRect(100, 0, 199, 99), nil)
 
-	b.Run("update", func(b *testing.B) {
+	b.Run("write", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			v.UpdateAt(152, 52, Tile{})
+			v.WriteAt(152, 52, Tile{})
 			<-v.Inbox
 		}
 	})
@@ -71,14 +71,22 @@ func TestView(t *testing.T) {
 	// Update a tile in view
 	tile, _ := v.At(5, 5)
 	tile[0] = 55
-	v.UpdateAt(5, 5, tile)
+	v.WriteAt(5, 5, tile)
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
 	assert.Equal(t, tile, update.Tile)
 
+	// Merge a tile in view, but with zero mask (won't do anything)
+	tile, _ = v.At(5, 5)
+	tile[0] = 66
+	v.MergeAt(5, 5, tile, Tile{}) // zero mask
+	update = <-v.Inbox
+	assert.Equal(t, At(5, 5), update.Point)
+	assert.NotEqual(t, tile, update.Tile)
+
 	// Close the view
 	assert.NoError(t, v.Close())
-	v.UpdateAt(5, 5, tile)
+	v.WriteAt(5, 5, tile)
 	assert.Equal(t, 0, len(v.Inbox))
 }
 

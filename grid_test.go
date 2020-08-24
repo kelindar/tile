@@ -10,11 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Benchmark_Grid/each-8         	     507	   2430008 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Grid/neighbors-8    	15184356	        79.3 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_Grid/within-8       	   26259	     45356 ns/op	       0 B/op	       0 allocs/op
-func Benchmark_Grid(b *testing.B) {
+// BenchmarkGrid/each-8         	     470	   2542553 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkGrid/neighbors-8    	14634110	        81.3 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkGrid/within-8       	   18404	     65748 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkGrid/at-8           	63050044	        19.3 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkGrid/update-8       	59997300	        19.7 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkGrid/bits-8         	49997290	        24.2 ns/op	       0 B/op	       0 allocs/op
+func BenchmarkGrid(b *testing.B) {
 	var d [6]byte
+	var p Point
 	defer assert.NotNil(b, d)
 	m := NewGrid(768, 768)
 
@@ -22,8 +26,9 @@ func Benchmark_Grid(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Each(func(_ Point, tile Tile) {
-				d = tile // Pull data out
+			m.Each(func(point Point, tile Tile) {
+				p = point
+				d = tile
 			})
 		}
 	})
@@ -32,8 +37,9 @@ func Benchmark_Grid(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Neighbors(300, 300, func(_ Point, tile Tile) {
-				d = tile // Pull data out
+			m.Neighbors(300, 300, func(point Point, tile Tile) {
+				p = point
+				d = tile
 			})
 		}
 	})
@@ -42,9 +48,35 @@ func Benchmark_Grid(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Within(At(100, 100), At(200, 200), func(p Point, tile Tile) {
-				d = tile // Pull data out
+			m.Within(At(100, 100), At(200, 200), func(point Point, tile Tile) {
+				p = point
+				d = tile
 			})
+		}
+	})
+
+	assert.NotZero(b, p.X)
+	b.Run("at", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			d, _ = m.At(100, 100)
+		}
+	})
+
+	b.Run("write", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.WriteAt(100, 100, Tile{})
+		}
+	})
+
+	b.Run("merge", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.MergeAt(100, 100, Tile{}, Tile{0, 1, 0, 0, 0})
 		}
 	})
 }
@@ -130,7 +162,7 @@ func TestNeighbors(t *testing.T) {
 	m := NewGrid(9, 9)
 	m.Each(func(p Point, tile Tile) {
 		copy(tile[:], p.String()[:3])
-		m.UpdateAt(p.X, p.Y, tile)
+		m.WriteAt(p.X, p.Y, tile)
 	})
 
 	// Run all the tests
@@ -149,7 +181,7 @@ func TestAt(t *testing.T) {
 	m := NewGrid(9, 9)
 	m.Each(func(p Point, tile Tile) {
 		copy(tile[:], p.String()[:3])
-		m.UpdateAt(p.X, p.Y, tile)
+		m.WriteAt(p.X, p.Y, tile)
 	})
 
 	// Make sure our At() and the position matches
@@ -165,4 +197,29 @@ func TestAt(t *testing.T) {
 			assert.Equal(t, At(x, y).String(), string(at[:3]))
 		}
 	}
+}
+
+func TestUpdate(t *testing.T) {
+
+	// Create a 9x9 map with labeled tiles
+	m := NewGrid(9, 9)
+	i := 0
+	m.Each(func(p Point, tile Tile) {
+		i++
+		tile[0] = byte(i)
+		m.WriteAt(p.X, p.Y, tile)
+	})
+
+	// Assert the update
+	tile, _ := m.At(8, 8)
+	assert.Equal(t, 81, int(tile[0]))
+
+	// 81 = 0b01010001
+	tile[0] = 0b00101110 // change last 2 bits and should ignore other bits
+	m.MergeAt(8, 8, tile, Tile{
+		0b00000011, 0, 0, 0, 0, 0,
+	})
+
+	tile, _ = m.At(8, 8)
+	assert.Equal(t, 0b01010010, int(tile[0]))
 }

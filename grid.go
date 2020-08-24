@@ -111,14 +111,21 @@ func (m *Grid) At(x, y int16) (Tile, bool) {
 	return Tile{}, false
 }
 
-// UpdateAt updates the tile at a specific coordinate
-func (m *Grid) UpdateAt(x, y int16, tile Tile) {
-
-	// Update the tile in the map
+// WriteAt updates the entire tile value at a specific coordinate
+func (m *Grid) WriteAt(x, y int16, tile Tile) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		if m.pages[m.indexOf(x/3, y/3)].Set(x, y, tile) {
-			// Notify the observers, if any
+		if m.pages[m.indexOf(x/3, y/3)].SetTile(x, y, tile) {
 			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), tile)
+		}
+	}
+}
+
+// MergeAt updates the bits of tile at a specific coordinate. The bits are specified
+// by the mask. The bits that need to be updated should be flipped on in the mask.
+func (m *Grid) MergeAt(x, y int16, tile, mask Tile) {
+	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
+		if v, ok := m.pages[m.indexOf(x/3, y/3)].SetBits(x, y, tile, mask); ok {
+			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), v)
 		}
 	}
 }
@@ -189,18 +196,53 @@ func (p *page) Bounds() Rect {
 	return Rect{p.point, At(p.point.X+3, p.point.Y+3)}
 }
 
-// Set updates the tile at a specific coordinate
-func (p *page) Set(x, y int16, tile Tile) (observed bool) {
+// SetTile updates the tile at a specific coordinate
+func (p *page) SetTile(x, y int16, tile Tile) bool {
+	i := (y%3)*3 + (x % 3)
+
+	// Synchronize the update from this point on
 	p.Lock()
-	p.tiles[(y%3)*3+(x%3)] = tile // Update the tile
-	observed = p.flags&1 != 0     // Are there any observers?
+	p.tiles[i] = tile
+	notify := p.flags&1 != 0
 	p.Unlock()
-	return
+
+	// Return whether tile is observed or not
+	return notify
+}
+
+// SetBits updates certain tile bits at a specific coordinate
+func (p *page) SetBits(x, y int16, tile, mask Tile) (Tile, bool) {
+	t := uint64(tile[0]) | uint64(tile[1])<<8 | uint64(tile[2])<<16 |
+		uint64(tile[3])<<24 | uint64(tile[4])<<32 | uint64(tile[5])<<40
+	m := uint64(mask[0]) | uint64(mask[1])<<8 | uint64(mask[2])<<16 |
+		uint64(mask[3])<<24 | uint64(mask[4])<<32 | uint64(mask[5])<<40
+	i := (y%3)*3 + (x % 3)
+
+	// Get the tile and do the binary merge
+	p.Lock()
+	b := &p.tiles[i]
+	v := uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 |
+		uint64(b[3])<<24 | uint64(b[4])<<32 | uint64(b[5])<<40
+	v = (v &^ m) | (t & m)
+
+	// Write the merged result back
+	b[0] = byte(v)
+	b[1] = byte(v >> 8)
+	b[2] = byte(v >> 16)
+	b[3] = byte(v >> 24)
+	b[4] = byte(v >> 32)
+	b[5] = byte(v >> 40)
+	merged, notify := *b, p.flags&1 != 0
+	p.Unlock()
+
+	// Return the merged tile data and whether tile is observed or not
+	return merged, notify
 }
 
 // Get gets a tile at a specific coordinate.
 func (p *page) Get(x, y int16) (tile Tile) {
 	i := (y%3)*3 + (x % 3)
+
 	p.Lock()
 	tile = p.tiles[i]
 	p.Unlock()

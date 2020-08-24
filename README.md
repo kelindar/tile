@@ -9,7 +9,7 @@
 This repository contains a 2D tile map engine which is built with data and cache friendly ways. My main goal here is to provide a simple, high performance library to handle large scale tile maps in games.
 
 * **Compact**. Each tile is 6 bytes long and each grid page is 64-bytes long, which means a grid of 3000x3000 should take around 64MB of memory.
-* **Thread-safety**. The grid is thread-safe and can be updated through provided update function. This allows multiple goroutines to read/write to the grid concurrently without any contentions. There is a spinlock per tile page protecting tile access.
+* **Thread-safe**. The grid is thread-safe and can be updated through provided update function. This allows multiple goroutines to read/write to the grid concurrently without any contentions. There is a spinlock per tile page protecting tile access.
 * **Views & observers**. When a tile on the grid is updated, viewers of the tile will be notified of the update and can react to the changes. The idea is to allow you to build more complex, reactive systems on top of the grid.
 * **Zero-allocation** (or close to it) traversal of the grid. The grid is pre-allocated entirely and this library provides a few ways of traversing it.
 * **Path-finding**. The library provides a A* pathfinding algorithm in order to compute a path between two points, as well as a BFS-based position scanning which searches the map around a point.
@@ -50,17 +50,38 @@ if tile, ok := grid.At(50, 100); ok {
 }
 ```
 
-The `UpdateAt()` method of the grid allows you to update a tile at a specific `x,y` coordinate. Since the `Grid` itself is thread-safe, this is the way to (a) make sure the tile update/read is not racing and (b) notify observers of a tile update (more about this below).
+The `WriteAt()` method of the grid allows you to update a tile at a specific `x,y` coordinate. Since the `Grid` itself is thread-safe, this is the way to (a) make sure the tile update/read is not racing and (b) notify observers of a tile update (more about this below).
 
 ```go
-grid.UpdateAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
+grid.WriteAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
 ```
 
 The `Neighbors()` method of the grid allows you to get the direct neighbors at a particular `x,y` coordinate and it takes an iterator funcion which is called for each neighbor. In this implementation, we are only taking direct neighbors (top, left, bottom, right). You rarely will need to use this method, unless you are rolling out your own pathfinding algorithm.
 
 ```go
-grid.UpdateAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
+grid.WriteAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
 ```
+
+
+The `MergeAt()` method of the grid allows you to transactionally update only some of the bits at a particular `x,y` coordinate. This operation is as well thread-safe, and is actually useful when you might have multiple goroutines updating a set of tiles, but various goroutines are responsible for the various parts of the tile data. You might have a system that updates only a first couple of tile flags and another system updates some other bits. By using this method, two goroutines can update the different bits of the same tile concurrently, without erasing each other's results, which would happen if you just call `WriteAt()`.
+
+```go
+// assume byte[0] of the tile is 0b01010001
+grid.MergeAt(0, 0, 
+    Tile{0b00101110, 0, 0, 0, 0, 0}, // Only last 2 bits matter
+    Tile{0b00000011, 0, 0, 0, 0, 0} // Mask specifies that we want to update last 2 bits
+)
+
+// If the original is currently: 0b01010001
+// ...the result result will be: 0b01010010
+```
+
+The `Neighbors()` method of the grid allows you to get the direct neighbors at a particular `x,y` coordinate and it takes an iterator funcion which is called for each neighbor. In this implementation, we are only taking direct neighbors (top, left, bottom, right). You rarely will need to use this method, unless you are rolling out your own pathfinding algorithm.
+
+```go
+grid.WriteAt(50, 100, Tile{1, 2, 3, 4, 5, 6})
+```
+
 
 # Pathfinding
 
@@ -185,21 +206,29 @@ if err != nil{
 This library contains quite a bit of various micro-benchmarks to make sure that everything stays pretty fast. Feel free to clone and play around with them yourself. Below are the benchmarks which we have, most of them are running on relatively large grids.
 
 ```
-goarch: amd64
-pkg: github.com/kelindar/tile
-Benchmark_Grid/each-8         	     327	   3636155 ns/op	       0 B/op	       0 allocs/op
-Benchmark_Grid/neighbors-8    	16902478	        69.6 ns/op	       0 B/op	       0 allocs/op
-Benchmark_Grid/within-8       	   21237	     56224 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPath/9x9-8           	  210522	      5256 ns/op	   16468 B/op	       3 allocs/op
-BenchmarkPath/300x300-8       	     489	   2446567 ns/op	 7801130 B/op	       4 allocs/op
-BenchmarkAround/3r-8          	  363295	      3243 ns/op	     385 B/op	       1 allocs/op
-BenchmarkAround/5r-8          	  164382	      7288 ns/op	     931 B/op	       2 allocs/op
-BenchmarkAround/10r-8         	   64854	     18749 ns/op	    3489 B/op	       2 allocs/op
-BenchmarkHeap-8               	  101647	     11806 ns/op	    3968 B/op	       5 allocs/op
-BenchmarkStore/save-8         	    7987	    148116 ns/op	       8 B/op	       1 allocs/op
-BenchmarkStore/read-8         	    3411	    347572 ns/op	  659881 B/op	     107 allocs/op
-BenchmarkView/update-8        	10619600	       110 ns/op	      16 B/op	       1 allocs/op
-BenchmarkView/move-8          	    7488	    153847 ns/op	       0 B/op	       0 allocs/op
+enchmarkGrid/each-8                  514   2309290 ns/op         0 B/op   0 allocs/op
+BenchmarkGrid/neighbors-8       14809420      81.0 ns/op         0 B/op   0 allocs/op
+BenchmarkGrid/within-8             18488     64583 ns/op         0 B/op   0 allocs/op
+BenchmarkGrid/at-8              59917014      19.4 ns/op         0 B/op   0 allocs/op
+BenchmarkGrid/write-8           59944251      19.3 ns/op         0 B/op   0 allocs/op
+BenchmarkGrid/merge-8           49933837      24.0 ns/op         0 B/op   0 allocs/op
+BenchmarkPath/9x9-8               206911      5361 ns/op     16468 B/op   3 allocs/op
+BenchmarkPath/300x300-8              460   2558757 ns/op   7801175 B/op   4 allocs/op
+BenchmarkPath/381x381-8              454   2689466 ns/op  62394354 B/op   4 allocs/op
+BenchmarkPath/384x384-8              152   7809399 ns/op  62396320 B/op   5 allocs/op
+BenchmarkPath/6144x6144-8            141   7461047 ns/op  62395595 B/op   3 allocs/op
+BenchmarkPath/6147x6147-8            160   7462501 ns/op  62395357 B/op   3 allocs/op
+BenchmarkAround/3r-8              333166      3485 ns/op       385 B/op   1 allocs/op
+BenchmarkAround/5r-8              153844      7833 ns/op       931 B/op   2 allocs/op
+BenchmarkAround/10r-8              59702     20083 ns/op      3489 B/op   2 allocs/op
+BenchmarkHeap-8                    97560     12229 ns/op      3968 B/op   5 allocs/op
+BenchmarkPoint/within-8       1000000000     0.218 ns/op         0 B/op   0 allocs/op
+BenchmarkPoint/within-rect-8  1000000000     0.218 ns/op         0 B/op   0 allocs/op
+BenchmarkPoint/interleave-8   1000000000     0.652 ns/op         0 B/op   0 allocs/op
+BenchmarkStore/save-8               7045    173594 ns/op         8 B/op   1 allocs/op
+BenchmarkStore/read-8               2666    453553 ns/op    651594 B/op   8 allocs/op
+BenchmarkView/write-8           10619553       111 ns/op        16 B/op   1 allocs/op
+BenchmarkView/move-8                7500    160667 ns/op         0 B/op   0 allocs/op
 ```
 
 # Contributing

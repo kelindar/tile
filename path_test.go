@@ -236,7 +236,7 @@ func mapFrom(name string) *Grid {
 			switch v.R {
 			case 255:
 			case 0:
-				m.UpdateAt(x, y, Tile{0xff, 0, 0, 0, 0, 0})
+				m.WriteAt(x, y, Tile{0xff, 0, 0, 0, 0, 0})
 			}
 
 		}
