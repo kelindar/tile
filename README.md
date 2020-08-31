@@ -4,7 +4,7 @@
 </p>
 
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/kelindar/tile)
-[![GoDoc](https://godoc.org/github.com/kelindar/tile?status.png)](http://godoc.org/github.com/kelindar/tile)
+[![PkgGoDev](https://pkg.go.dev/badge/kelindar/tile)](https://pkg.go.dev/kelindar/tile)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kelindar/tile)](https://goreportcard.com/report/github.com/kelindar/tile)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Coverage Status](https://coveralls.io/repos/github/kelindar/tile/badge.svg)](https://coveralls.io/github/kelindar/tile)
