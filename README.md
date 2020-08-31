@@ -7,9 +7,6 @@
 [![GoDoc](https://godoc.org/github.com/kelindar/tile?status.png)](http://godoc.org/github.com/kelindar/tile)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kelindar/tile)](https://goreportcard.com/report/github.com/kelindar/tile)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Coverage Status](https://coveralls.io/repos/github/kelindar/tile/badge.svg)](https://coveralls.io/github/kelindar/tile)
-![GitHub All Releases](https://img.shields.io/github/downloads/kelindar/tile/total)
-
 
 This repository contains a 2D tile map engine which is built with data and cache friendly ways. My main goal here is to provide a simple, high performance library to handle large scale tile maps in games.
 
