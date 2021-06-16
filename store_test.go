@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkStore/save-8         	    8553	    140302 ns/op	       8 B/op	       1 allocs/op
-// BenchmarkStore/load-8         	    3330	    350548 ns/op	  659882 B/op	     107 allocs/op
+// BenchmarkStore/save-8         	    6327	    188285 ns/op	       8 B/op	       1 allocs/op
+// BenchmarkStore/read-8         	    2380	    471609 ns/op	  651594 B/op	       8 allocs/op
 func BenchmarkStore(b *testing.B) {
 	m := mapFrom("300x300.png")
 
