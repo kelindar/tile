@@ -209,8 +209,9 @@ type Rect struct {
 }
 
 // NewRect creates a new rectangle
-func NewRect(left, top, bottom, right int16) Rect {
-	return Rect{Min: At(left, top), Max: At(bottom, right)}
+// left,top,right,bottom correspond to x1,y1,x2,y2
+func NewRect(left, top, right, bottom int16) Rect {
+	return Rect{Min: At(left, top), Max: At(right, bottom)}
 }
 
 // Contains returns whether a point is within the rectangle or not.
