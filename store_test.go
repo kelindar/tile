@@ -11,8 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkStore/save-8         	    6327	    188285 ns/op	       8 B/op	       1 allocs/op
-// BenchmarkStore/read-8         	    2380	    471609 ns/op	  651594 B/op	       8 allocs/op
+/*
+cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
+BenchmarkStore/save-8         	    9068	    129974 ns/op	       8 B/op	       1 allocs/op
+BenchmarkStore/read-8         	    2967	    379663 ns/op	  647465 B/op	       8 allocs/op
+*/
 func BenchmarkStore(b *testing.B) {
 	m := mapFrom("300x300.png")
 
