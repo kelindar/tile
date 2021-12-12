@@ -10,12 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkGrid/each-8         	     524	   2272672 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkGrid/neighbors-8    	17840230	        69.34 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkGrid/within-8       	   18727	     64443 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkGrid/at-8           	61221052	        18.31 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkGrid/write-8        	59267746	        18.01 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkGrid/merge-8        	49427276	        23.88 ns/op	       0 B/op	       0 allocs/op
+/*
+cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
+BenchmarkGrid/each-8         	     698	   1694002 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/neighbors-8    	19652220	        66.16 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/within-8       	   26200	     47040 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/at-8           	59190276	        16.96 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/write-8        	100000000	        15.40 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/merge-8        	52110926	        23.06 ns/op	       0 B/op	       0 allocs/op
+*/
 func BenchmarkGrid(b *testing.B) {
 	var d [6]byte
 	var p Point

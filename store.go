@@ -4,46 +4,45 @@
 package tile
 
 import (
-	"bufio"
 	"encoding/binary"
 	"io"
+
+	"github.com/kelindar/iostream"
 )
 
 const tileDataSize = 54
 
 // WriteTo writes the grid to a specific writer.
 func (m *Grid) WriteTo(dst io.Writer) (n int64, err error) {
-	var c int
 	p1 := At(0, 0)
 	p2 := At(m.Size.X-1, m.Size.Y-1)
 
 	// Write the viewport size
+	w := iostream.NewWriter(dst)
 	header := make([]byte, 8)
 	binary.BigEndian.PutUint16(header[0:2], uint16(p1.X))
 	binary.BigEndian.PutUint16(header[2:4], uint16(p1.Y))
 	binary.BigEndian.PutUint16(header[4:6], uint16(p2.X))
 	binary.BigEndian.PutUint16(header[6:8], uint16(p2.Y))
-	if c, err = dst.Write(header); err != nil {
-		return
+	if _, err := w.Write(header); err != nil {
+		return w.Offset(), err
 	}
-	n += int64(c)
 
 	// Write the grid data
 	m.pagesWithin(p1, p2, func(page *page) {
-		if c, err = dst.Write(page.Data()); err != nil {
+		if _, err := w.Write(page.Data()); err != nil {
 			return
 		}
-		n += int64(c)
 	})
-	return
+	return w.Offset(), nil
 }
 
 // ReadFrom reads the grid from the reader.
-func ReadFrom(rdr io.Reader) (grid *Grid, err error) {
-	reader := bufio.NewReader(rdr)
+func ReadFrom(src io.Reader) (grid *Grid, err error) {
+	r := iostream.NewReader(src)
 	header := make([]byte, 8)
-	if _, err = io.ReadFull(reader, header); err != nil {
-		return
+	if _, err := io.ReadFull(r, header); err != nil {
+		return nil, err
 	}
 
 	// Read the size
@@ -57,7 +56,7 @@ func ReadFrom(rdr io.Reader) (grid *Grid, err error) {
 	grid = NewGrid(view.Max.X+1, view.Max.Y+1)
 	buf := make([]byte, tileDataSize)
 	grid.pagesWithin(view.Min, view.Max, func(page *page) {
-		if _, err = io.ReadFull(reader, buf); err != nil {
+		if _, err := io.ReadFull(r, buf); err != nil {
 			return
 		}
 
