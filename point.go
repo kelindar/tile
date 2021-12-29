@@ -188,6 +188,35 @@ func (p Point) WithinSize(size Point) bool {
 	return p.X >= 0 && p.Y >= 0 && p.X < size.X && p.Y < size.Y
 }
 
+// Move moves a point by one in the specified direction.
+func (p Point) Move(direction Direction) Point {
+	return p.MoveBy(direction, 1)
+}
+
+// MoveBy moves a point by n in the specified direction.
+func (p Point) MoveBy(direction Direction, n int16) Point {
+	switch direction {
+	case North:
+		return Point{p.X, p.Y + n}
+	case NorthEast:
+		return Point{p.X + n, p.Y + n}
+	case East:
+		return Point{p.X + n, p.Y}
+	case SouthEast:
+		return Point{p.X + n, p.Y - n}
+	case South:
+		return Point{p.X, p.Y - n}
+	case SouthWest:
+		return Point{p.X - n, p.Y - n}
+	case West:
+		return Point{p.X - n, p.Y}
+	case NorthWest:
+		return Point{p.X - n, p.Y + n}
+	default:
+		return p
+	}
+}
+
 // DistanceTo calculates manhattan distance to the other point
 func (p Point) DistanceTo(other Point) uint32 {
 	return abs(int32(p.X)-int32(other.X)) + abs(int32(p.Y)-int32(other.Y))
@@ -229,5 +258,46 @@ func (r *Rect) Size() Point {
 	return Point{
 		X: r.Max.X - r.Min.X,
 		Y: r.Max.Y - r.Min.Y,
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+// Diretion represents a direction
+type Direction byte
+
+// Various directions
+const (
+	North Direction = iota
+	NorthEast
+	East
+	SouthEast
+	South
+	SouthWest
+	West
+	NorthWest
+)
+
+// String returns a string representation of a direction
+func (v Direction) String() string {
+	switch v {
+	case North:
+		return "🡱N"
+	case NorthEast:
+		return "🡵NE"
+	case East:
+		return "🡲E"
+	case SouthEast:
+		return "🡶SE"
+	case South:
+		return "🡳S"
+	case SouthWest:
+		return "🡷SW"
+	case West:
+		return "🡰W"
+	case NorthWest:
+		return "🡴NW"
+	default:
+		return ""
 	}
 }

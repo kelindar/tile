@@ -94,6 +94,24 @@ func BenchmarkPath(b *testing.B) {
 		}
 	})
 
+	b.Run("3069x3069", func(b *testing.B) {
+		m := NewGrid(3069, 3069)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(0, 0), At(700, 700), costOf)
+		}
+	})
+
+	b.Run("3072x3072", func(b *testing.B) {
+		m := NewGrid(3072, 3072)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.Path(At(0, 0), At(700, 700), costOf)
+		}
+	})
+
 	b.Run("6144x6144", func(b *testing.B) {
 		m := NewGrid(6144, 6144)
 		b.ReportAllocs()
@@ -102,16 +120,6 @@ func BenchmarkPath(b *testing.B) {
 			m.Path(At(0, 0), At(380, 380), costOf)
 		}
 	})
-
-	b.Run("6147x6147", func(b *testing.B) {
-		m := NewGrid(6147, 6147)
-		b.ReportAllocs()
-		b.ResetTimer()
-		for n := 0; n < b.N; n++ {
-			m.Path(At(0, 0), At(380, 380), costOf)
-		}
-	})
-
 }
 
 // BenchmarkAround/3r-8         	  352876	      3355 ns/op	     385 B/op	       1 allocs/op
