@@ -90,14 +90,14 @@ func TestMove(t *testing.T) {
 		dir Direction
 		out Point
 	}{
-		{North, Point{X: 0, Y: 1}},
-		{South, Point{X: 0, Y: -1}},
+		{North, Point{X: 0, Y: -1}},
+		{South, Point{X: 0, Y: 1}},
 		{East, Point{X: 1, Y: 0}},
 		{West, Point{X: -1, Y: 0}},
-		{NorthEast, Point{X: 1, Y: 1}},
-		{NorthWest, Point{X: -1, Y: 1}},
-		{SouthEast, Point{X: 1, Y: -1}},
-		{SouthWest, Point{X: -1, Y: -1}},
+		{NorthEast, Point{X: 1, Y: -1}},
+		{NorthWest, Point{X: -1, Y: -1}},
+		{SouthEast, Point{X: 1, Y: 1}},
+		{SouthWest, Point{X: -1, Y: 1}},
 		{Direction(99), Point{}},
 	}
 

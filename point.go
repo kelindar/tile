@@ -197,21 +197,21 @@ func (p Point) Move(direction Direction) Point {
 func (p Point) MoveBy(direction Direction, n int16) Point {
 	switch direction {
 	case North:
-		return Point{p.X, p.Y + n}
+		return Point{p.X, p.Y - n}
 	case NorthEast:
-		return Point{p.X + n, p.Y + n}
+		return Point{p.X + n, p.Y - n}
 	case East:
 		return Point{p.X + n, p.Y}
 	case SouthEast:
-		return Point{p.X + n, p.Y - n}
+		return Point{p.X + n, p.Y + n}
 	case South:
-		return Point{p.X, p.Y - n}
+		return Point{p.X, p.Y + n}
 	case SouthWest:
-		return Point{p.X - n, p.Y - n}
+		return Point{p.X - n, p.Y + n}
 	case West:
 		return Point{p.X - n, p.Y}
 	case NorthWest:
-		return Point{p.X - n, p.Y + n}
+		return Point{p.X - n, p.Y - n}
 	default:
 		return p
 	}
