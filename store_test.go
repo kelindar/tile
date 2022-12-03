@@ -6,6 +6,7 @@ package tile
 import (
 	"bytes"
 	"compress/flate"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +76,22 @@ func TestSaveLoadFlate(t *testing.T) {
 	// Load the map back
 	reader := flate.NewReader(output)
 	out, err := ReadFrom(reader)
+	assert.NoError(t, err)
+	assert.Equal(t, m.pages, out.pages)
+}
+
+func TestSaveLoadFile(t *testing.T) {
+	temp, err := os.CreateTemp("", "*")
+	assert.NoError(t, err)
+	defer os.Remove(temp.Name())
+
+	println(temp.Name())
+	// Write a test map into temp file
+	m := mapFrom("300x300.png")
+	assert.NoError(t, m.WriteFile(temp.Name()))
+
+	// Read the map back
+	out, err := ReadFile(temp.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }

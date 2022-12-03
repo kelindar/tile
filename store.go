@@ -4,13 +4,17 @@
 package tile
 
 import (
+	"compress/flate"
 	"encoding/binary"
 	"io"
+	"os"
 
 	"github.com/kelindar/iostream"
 )
 
 const tileDataSize = 54
+
+// ---------------------------------- Stream ----------------------------------
 
 // WriteTo writes the grid to a specific writer.
 func (m *Grid) WriteTo(dst io.Writer) (n int64, err error) {
@@ -63,4 +67,42 @@ func ReadFrom(src io.Reader) (grid *Grid, err error) {
 		copy(page.Data(), buf)
 	})
 	return
+}
+
+// ---------------------------------- File ----------------------------------
+
+// WriteFile writes the grid into a flate-compressed binary file.
+func (m *Grid) WriteFile(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+	writer, err := flate.NewWriter(file, flate.BestSpeed)
+	if err != nil {
+		return err
+	}
+
+	// WriteTo the underlying writer
+	defer writer.Close()
+	_, err = m.WriteTo(writer)
+	return err
+}
+
+// Restore restores the grid from the specified file. The grid must
+// be written using the corresponding WriteFile() method.
+func ReadFile(filename string) (grid *Grid, err error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return nil, os.ErrNotExist
+	}
+
+	// Otherwise, attempt to open the file and restore
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+	return ReadFrom(flate.NewReader(file))
 }
