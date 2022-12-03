@@ -130,6 +130,14 @@ func (m *Grid) MergeAt(x, y int16, tile, mask Tile) {
 	}
 }
 
+// NotifyAt triggers the notification event for all of the observers at a given tile.
+func (m *Grid) NotifyAt(x, y int16) {
+	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
+		tile := m.pages[m.indexOf(x/3, y/3)].Get(x, y)
+		m.observers.Notify(At(x/3*3, y/3*3), At(x, y), tile)
+	}
+}
+
 // Neighbors iterates over the direct neighbouring tiles
 func (m *Grid) Neighbors(x, y int16, fn Iterator) {
 
@@ -166,7 +174,7 @@ func (m *Grid) Neighbors(x, y int16, fn Iterator) {
 func (m *Grid) View(rect Rect, fn Iterator) *View {
 	view := &View{
 		Grid:  m,
-		Inbox: make(chan Update, 8),
+		Inbox: make(chan Update, 16),
 		rect:  NewRect(-1, -1, -1, -1),
 	}
 

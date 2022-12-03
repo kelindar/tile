@@ -10,18 +10,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkView/write-8         	11170822	       105.1 ns/op	      16 B/op	       1 allocs/op
-// BenchmarkView/move-8          	    9049	    163019 ns/op	       0 B/op	       0 allocs/op
+/*
+cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
+BenchmarkView/write-8         	 5910660	       191.7 ns/op	      16 B/op	       1 allocs/op
+BenchmarkView/move-8          	    8253	    138149 ns/op	       0 B/op	       0 allocs/op
+BenchmarkView/notify-8        	 6024670	       197.5 ns/op	      16 B/op	       1 allocs/op
+*/
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
 	v := m.View(NewRect(100, 0, 199, 99), nil)
+	go func() {
+		for range v.Inbox {
+		}
+	}()
 
 	b.Run("write", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
 			v.WriteAt(152, 52, Tile{})
-			<-v.Inbox
 		}
 	})
 
@@ -35,6 +42,14 @@ func BenchmarkView(b *testing.B) {
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
 			v.MoveAt(locs[n%2], nil)
+		}
+	})
+
+	b.Run("notify", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.NotifyAt(150, 50)
 		}
 	})
 }
@@ -131,6 +146,21 @@ func TestObserversNil(t *testing.T) {
 		var ev *observers
 		ev.Notify(&Update{Point: At(1, 0)})
 	})
+}
+
+func TestNotifyAt(t *testing.T) {
+	m := mapFrom("300x300.png")
+
+	// Create a new view
+	c := counter(0)
+	v := m.View(NewRect(0, 0, 99, 99), c.count)
+	assert.NotNil(t, v)
+	assert.Equal(t, 10000, int(c))
+
+	m.NotifyAt(1, 1)
+	update := <-v.Inbox
+	assert.Equal(t, int16(1), update.X)
+	assert.Equal(t, int16(1), update.Y)
 }
 
 type fakeView func(*Update)
