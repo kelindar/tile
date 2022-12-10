@@ -38,7 +38,7 @@ func BenchmarkStore(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			ReadFrom(bytes.NewBuffer(enc.Bytes()))
+			ReadFrom[string](bytes.NewBuffer(enc.Bytes()))
 		}
 	})
 
@@ -54,7 +54,7 @@ func TestSaveLoad(t *testing.T) {
 	assert.Equal(t, int64(360008), n)
 
 	// Load the map back
-	out, err := ReadFrom(enc)
+	out, err := ReadFrom[string](enc)
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }
@@ -75,7 +75,7 @@ func TestSaveLoadFlate(t *testing.T) {
 
 	// Load the map back
 	reader := flate.NewReader(output)
-	out, err := ReadFrom(reader)
+	out, err := ReadFrom[string](reader)
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }
@@ -93,7 +93,7 @@ func TestSaveLoadFile(t *testing.T) {
 	assert.Equal(t, int64(16533), fi.Size())
 
 	// Read the map back
-	out, err := ReadFile(temp.Name())
+	out, err := ReadFile[string](temp.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }

@@ -107,7 +107,7 @@ func TestView(t *testing.T) {
 
 type counter int
 
-func (c *counter) count(p Point, tile Cursor) {
+func (c *counter) count(p Point, tile Cursor[string]) {
 	*c++
 }
 

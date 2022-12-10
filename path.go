@@ -17,7 +17,7 @@ type edge struct {
 }
 
 // Around performs a breadth first search around a point.
-func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
+func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Point, Cursor[T])) {
 	start, ok := m.At(from.X, from.Y)
 	if !ok {
 		return
@@ -41,7 +41,7 @@ func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 		current := unpackPoint(pCurr)
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor[T]) {
 			if d := from.DistanceTo(next); d > distance {
 				return // Too far
 			}
@@ -62,7 +62,7 @@ func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 }
 
 // Path calculates a short path and the distance between the two locations
-func (m *Grid) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
+func (m *Grid[T]) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 
 	// Acquire a frontier heap for search
 	frontier := acquireHeap()
@@ -97,7 +97,7 @@ func (m *Grid) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 		}
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor[T]) {
 			cNext := costOf(nextTile.Tile())
 			if cNext == 0 {
 				return // Blocked tile, ignore completely

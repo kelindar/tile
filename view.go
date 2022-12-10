@@ -14,21 +14,21 @@ type Update struct {
 }
 
 // View represents a view which can monitor a collection of tiles.
-type View struct {
-	Grid  *Grid       // The associated map
+type View[T comparable] struct {
+	Grid  *Grid[T]    // The associated map
 	Inbox chan Update // The update inbox for the view
 	rect  Rect        // The view box
 }
 
 // Resize resizes the viewport.
-func (v *View) Resize(box Rect, fn Iterator) {
+func (v *View[T]) Resize(box Rect, fn func(Point, Cursor[T])) {
 	owner := v.Grid // The parent map
 	prev := v.rect  // Previous bounding box
 	v.rect = box    // New bounding box
 
 	// Unsubscribe from the pages which are not required anymore
 	if prev.Min.X >= 0 || prev.Min.Y >= 0 || prev.Max.X >= 0 || prev.Max.Y >= 0 {
-		owner.pagesWithin(prev.Min, prev.Max, func(page *page) {
+		owner.pagesWithin(prev.Min, prev.Max, func(page *page[T]) {
 			if bounds := page.Bounds(); !bounds.Intersects(box) {
 				if owner.observers.Unsubscribe(page.point, v) {
 					page.SetObserved(false) // Mark the page as not being observed
@@ -38,7 +38,7 @@ func (v *View) Resize(box Rect, fn Iterator) {
 	}
 
 	// Subscribe to every page which we have not previously subscribed
-	owner.pagesWithin(box.Min, box.Max, func(page *page) {
+	owner.pagesWithin(box.Min, box.Max, func(page *page[T]) {
 		if bounds := page.Bounds(); !bounds.Intersects(prev) {
 			if owner.observers.Subscribe(page.point, v) {
 				page.SetObserved(true) // Mark the page as being observed
@@ -47,7 +47,7 @@ func (v *View) Resize(box Rect, fn Iterator) {
 
 		// Callback for each new tile in the view
 		if fn != nil {
-			page.Each(func(p Point, v Cursor) {
+			page.Each(func(p Point, v Cursor[T]) {
 				if !prev.Contains(p) && box.Contains(p) {
 					fn(p, v)
 				}
@@ -57,7 +57,7 @@ func (v *View) Resize(box Rect, fn Iterator) {
 }
 
 // MoveBy moves the viewport towards a particular direction.
-func (v *View) MoveBy(x, y int16, fn Iterator) {
+func (v *View[T]) MoveBy(x, y int16, fn func(Point, Cursor[T])) {
 	v.Resize(Rect{
 		Min: v.rect.Min.Add(At(x, y)),
 		Max: v.rect.Max.Add(At(x, y)),
@@ -65,7 +65,7 @@ func (v *View) MoveBy(x, y int16, fn Iterator) {
 }
 
 // MoveAt moves the viewport to a specific coordinate.
-func (v *View) MoveAt(nw Point, fn Iterator) {
+func (v *View[T]) MoveAt(nw Point, fn func(Point, Cursor[T])) {
 	size := v.rect.Max.Subtract(v.rect.Min)
 	v.Resize(Rect{
 		Min: nw,
@@ -74,29 +74,29 @@ func (v *View) MoveAt(nw Point, fn Iterator) {
 }
 
 // Each iterates over all of the tiles in the view.
-func (v *View) Each(fn Iterator) {
+func (v *View[T]) Each(fn func(Point, Cursor[T])) {
 	v.Grid.Within(v.rect.Min, v.rect.Max, fn)
 }
 
 // At returns the tile at a specified position.
-func (v *View) At(x, y int16) (Cursor, bool) {
+func (v *View[T]) At(x, y int16) (Cursor[T], bool) {
 	return v.Grid.At(x, y)
 }
 
 // WriteAt updates the entire tile at a specific coordinate.
-func (v *View) WriteAt(x, y int16, tile Tile) {
+func (v *View[T]) WriteAt(x, y int16, tile Tile) {
 	v.Grid.WriteAt(x, y, tile)
 }
 
 // MergeAt updates the bits of tile at a specific coordinate. The bits are specified
 // by the mask. The bits that need to be updated should be flipped on in the mask.
-func (v *View) MergeAt(x, y int16, tile, mask Tile) {
+func (v *View[T]) MergeAt(x, y int16, tile, mask Tile) {
 	v.Grid.MergeAt(x, y, tile, mask)
 }
 
 // Close closes the view and unsubscribes from everything.
-func (v *View) Close() error {
-	v.Grid.pagesWithin(v.rect.Min, v.rect.Max, func(page *page) {
+func (v *View[T]) Close() error {
+	v.Grid.pagesWithin(v.rect.Min, v.rect.Max, func(page *page[T]) {
 		if v.Grid.observers.Unsubscribe(page.point, v) {
 			page.SetObserved(false) // Mark the page as not being observed
 		}
@@ -105,7 +105,7 @@ func (v *View) Close() error {
 }
 
 // onUpdate occurs when a tile has updated.
-func (v *View) onUpdate(ev *Update) {
+func (v *View[T]) onUpdate(ev *Update) {
 	if v.rect.Contains(ev.Point) {
 		v.Inbox <- *ev // (copy)
 	}

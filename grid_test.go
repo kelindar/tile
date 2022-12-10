@@ -4,6 +4,7 @@
 package tile
 
 import (
+	"io"
 	"testing"
 	"unsafe"
 
@@ -12,32 +13,24 @@ import (
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkGrid/each-8         	     799	   1489429 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/neighbors-8    	18933685	        60.70 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/within-8       	   25658	     47338 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/at-8           	80018670	        15.73 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/write-8        	80004266	        15.16 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/merge-8        	75013126	        16.57 ns/op	       0 B/op	       0 allocs/op
-
-cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkGrid/each-8         	    1120	   1144320 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/neighbors-8    	75234746	        15.82 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/within-8       	   34467	     35889 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/at-8           	432614364	         2.781 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/write-8        	169958166	         7.014 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/merge-8        	131469820	         9.190 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/each-8         	     804	   1393989 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/neighbors-8    	70167231	        17.26 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/within-8       	   29440	     41095 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/at-8           	410549198	         3.289 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/write-8        	154407861	         7.606 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/merge-8        	121471382	         9.839 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkGrid(b *testing.B) {
-	var d Cursor
+	var d Cursor[uint32]
 	var p Point
 	defer assert.NotNil(b, d)
-	m := NewGrid(768, 768)
+	m := NewGridOf[uint32](768, 768)
 
 	b.Run("each", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Each(func(point Point, tile Cursor) {
+			m.Each(func(point Point, tile Cursor[uint32]) {
 				p = point
 				d = tile
 			})
@@ -48,7 +41,7 @@ func BenchmarkGrid(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Neighbors(300, 300, func(point Point, tile Cursor) {
+			m.Neighbors(300, 300, func(point Point, tile Cursor[uint32]) {
 				p = point
 				d = tile
 			})
@@ -59,7 +52,7 @@ func BenchmarkGrid(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Within(At(100, 100), At(200, 200), func(point Point, tile Cursor) {
+			m.Within(At(100, 100), At(200, 200), func(point Point, tile Cursor[uint32]) {
 				p = point
 				d = tile
 			})
@@ -92,9 +85,53 @@ func BenchmarkGrid(b *testing.B) {
 	})
 }
 
+/*
+cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
+BenchmarkState/range-8         	11592040	       100.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/add-8           	50770226	        25.32 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/del-8           	59029844	        20.92 ns/op	       0 B/op	       0 allocs/op
+*/
+func BenchmarkState(b *testing.B) {
+	m := NewGridOf[int](768, 768)
+	m.Each(func(p Point, c Cursor[int]) {
+		for i := 0; i < 10; i++ {
+			c.Add(i)
+		}
+	})
+
+	b.Run("range", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			cursor, _ := m.At(100, 100)
+			cursor.Range(func(v int) error {
+				return nil
+			})
+		}
+	})
+
+	b.Run("add", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			cursor, _ := m.At(100, 100)
+			cursor.Add(100)
+		}
+	})
+
+	b.Run("del", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			cursor, _ := m.At(100, 100)
+			cursor.Del(100)
+		}
+	})
+}
+
 func TestPageSize(t *testing.T) {
 	assert.Equal(t, 8, int(unsafe.Sizeof(map[uintptr]Point{})))
-	assert.Equal(t, 64, int(unsafe.Sizeof(page{})))
+	assert.Equal(t, 64, int(unsafe.Sizeof(page[string]{})))
 	assert.Equal(t, 36, int(unsafe.Sizeof([9]Tile{})))
 }
 
@@ -102,7 +139,7 @@ func TestWithin(t *testing.T) {
 	m := NewGrid(9, 9)
 
 	var path []string
-	m.Within(At(1, 1), At(5, 5), func(p Point, tile Cursor) {
+	m.Within(At(1, 1), At(5, 5), func(p Point, tile Cursor[string]) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 25, len(path))
@@ -119,7 +156,7 @@ func TestWithinCorner(t *testing.T) {
 	m := NewGrid(9, 9)
 
 	var path []string
-	m.Within(At(7, 6), At(10, 10), func(p Point, tile Cursor) {
+	m.Within(At(7, 6), At(10, 10), func(p Point, tile Cursor[string]) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 6, len(path))
@@ -133,7 +170,7 @@ func TestWithinOneSide(t *testing.T) {
 	m := NewGrid(9, 9)
 
 	var path []string
-	m.Within(At(1, 6), At(4, 10), func(p Point, tile Cursor) {
+	m.Within(At(1, 6), At(4, 10), func(p Point, tile Cursor[string]) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 12, len(path))
@@ -147,7 +184,7 @@ func TestWithinOneSide(t *testing.T) {
 func TestWithinInvalid(t *testing.T) {
 	m := NewGrid(9, 9)
 	count := 0
-	m.Within(At(10, 10), At(20, 20), func(p Point, tile Cursor) {
+	m.Within(At(10, 10), At(20, 20), func(p Point, tile Cursor[string]) {
 		count++
 	})
 	assert.Equal(t, 0, count)
@@ -157,7 +194,7 @@ func TestEach(t *testing.T) {
 	m := NewGrid(9, 9)
 
 	var path []string
-	m.Each(func(p Point, tile Cursor) {
+	m.Each(func(p Point, tile Cursor[string]) {
 		path = append(path, p.String())
 	})
 	assert.Equal(t, 81, len(path))
@@ -188,14 +225,14 @@ func TestNeighbors(t *testing.T) {
 
 	// Create a 9x9 map with labeled tiles
 	m := NewGrid(9, 9)
-	m.Each(func(p Point, tile Cursor) {
+	m.Each(func(p Point, tile Cursor[string]) {
 		m.WriteAt(p.X, p.Y, Tile(p.Integer()))
 	})
 
 	// Run all the tests
 	for _, tc := range tests {
 		var out []string
-		m.Neighbors(tc.x, tc.y, func(_ Point, tile Cursor) {
+		m.Neighbors(tc.x, tc.y, func(_ Point, tile Cursor[string]) {
 			loc := unpackPoint(uint32(tile.Tile()))
 			out = append(out, loc.String())
 		})
@@ -207,12 +244,12 @@ func TestAt(t *testing.T) {
 
 	// Create a 9x9 map with labeled tiles
 	m := NewGrid(9, 9)
-	m.Each(func(p Point, tile Cursor) {
+	m.Each(func(p Point, tile Cursor[string]) {
 		m.WriteAt(p.X, p.Y, Tile(p.Integer()))
 	})
 
 	// Make sure our At() and the position matches
-	m.Each(func(p Point, tile Cursor) {
+	m.Each(func(p Point, tile Cursor[string]) {
 		at, _ := m.At(p.X, p.Y)
 		assert.Equal(t, p.String(), unpackPoint(uint32(at.Tile())).String())
 	})
@@ -231,7 +268,7 @@ func TestUpdate(t *testing.T) {
 	// Create a 9x9 map with labeled tiles
 	m := NewGrid(9, 9)
 	i := 0
-	m.Each(func(p Point, _ Cursor) {
+	m.Each(func(p Point, _ Cursor[string]) {
 		i++
 		m.WriteAt(p.X, p.Y, Tile(i))
 	})
@@ -250,4 +287,36 @@ func TestUpdate(t *testing.T) {
 	// result:   0101 0010
 	cursor, _ = m.At(8, 8)
 	assert.Equal(t, 0b01010010, int(cursor.Tile()))
+}
+
+func TestState(t *testing.T) {
+	m := NewGrid(9, 9)
+	m.Each(func(p Point, c Cursor[string]) {
+		c.Add(p.String())
+		c.Add(p.String()) // duplicate
+	})
+
+	m.Each(func(p Point, c Cursor[string]) {
+		assert.Equal(t, 1, c.Count())
+		assert.NoError(t, c.Range(func(s string) error {
+			assert.Equal(t, p.String(), s)
+			return nil
+		}))
+
+		c.Del(p.String())
+		assert.Equal(t, 0, c.Count())
+	})
+}
+
+func TestStateRangeErr(t *testing.T) {
+	m := NewGrid(9, 9)
+	m.Each(func(p Point, c Cursor[string]) {
+		c.Add(p.String())
+	})
+
+	m.Each(func(p Point, c Cursor[string]) {
+		assert.Error(t, c.Range(func(s string) error {
+			return io.EOF
+		}))
+	})
 }

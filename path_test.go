@@ -131,7 +131,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Cursor) {})
+			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Cursor[string]) {})
 		}
 	})
 
@@ -139,7 +139,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Cursor) {})
+			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Cursor[string]) {})
 		}
 	})
 
@@ -147,7 +147,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Cursor) {})
+			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Cursor[string]) {})
 		}
 	})
 }
@@ -157,7 +157,7 @@ func TestAround(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		var path []string
-		m.Around(At(2, 2), 3, costOf, func(p Point, tile Cursor) {
+		m.Around(At(2, 2), 3, costOf, func(p Point, tile Cursor[string]) {
 			path = append(path, p.String())
 		})
 		assert.Equal(t, 10, len(path))
@@ -223,7 +223,7 @@ func costOf(tile Tile) uint16 {
 }
 
 // mapFrom creates a map from ASCII string
-func mapFrom(name string) *Grid {
+func mapFrom(name string) *Grid[string] {
 	f, err := os.Open("fixtures/" + name)
 	defer f.Close()
 	if err != nil {
@@ -253,13 +253,13 @@ func mapFrom(name string) *Grid {
 }
 
 // plotPath plots the path on ASCII map
-func plotPath(m *Grid, path []Point) string {
+func plotPath(m *Grid[string], path []Point) string {
 	out := make([][]byte, m.Size.Y)
 	for i := range out {
 		out[i] = make([]byte, m.Size.X)
 	}
 
-	m.Each(func(l Point, tile Cursor) {
+	m.Each(func(l Point, tile Cursor[string]) {
 		//println(l.String(), int(tile[0]))
 		switch {
 		case pointInPath(l, path):
@@ -290,14 +290,14 @@ func pointInPath(point Point, path []Point) bool {
 }
 
 // draw converts the map to a black and white image for debugging purposes.
-func drawGrid(m *Grid, rect Rect) image.Image {
+func drawGrid(m *Grid[string], rect Rect) image.Image {
 	if rect.Max.X == 0 || rect.Max.Y == 0 {
 		rect = NewRect(0, 0, m.Size.X, m.Size.Y)
 	}
 
 	size := rect.Size()
 	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
-	m.Within(rect.Min, rect.Max, func(p Point, tile Cursor) {
+	m.Within(rect.Min, rect.Max, func(p Point, tile Cursor[string]) {
 		a := uint8(255)
 		if tile.Tile() == 1 {
 			a = 0
