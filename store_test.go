@@ -51,7 +51,7 @@ func TestSaveLoad(t *testing.T) {
 	enc := new(bytes.Buffer)
 	n, err := m.WriteTo(enc)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(540008), n)
+	assert.Equal(t, int64(360008), n)
 
 	// Load the map back
 	out, err := ReadFrom(enc)
@@ -70,8 +70,8 @@ func TestSaveLoadFlate(t *testing.T) {
 	n, err := m.WriteTo(writer)
 	assert.NoError(t, writer.Close())
 	assert.NoError(t, err)
-	assert.Equal(t, int64(540008), n)
-	assert.Equal(t, int(18299), output.Len())
+	assert.Equal(t, int64(360008), n)
+	assert.Equal(t, int(16533), output.Len())
 
 	// Load the map back
 	reader := flate.NewReader(output)
@@ -85,10 +85,12 @@ func TestSaveLoadFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(temp.Name())
 
-	println(temp.Name())
 	// Write a test map into temp file
 	m := mapFrom("300x300.png")
 	assert.NoError(t, m.WriteFile(temp.Name()))
+
+	fi, _ := temp.Stat()
+	assert.Equal(t, int64(16533), fi.Size())
 
 	// Read the map back
 	out, err := ReadFile(temp.Name())

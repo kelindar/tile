@@ -12,9 +12,9 @@ import (
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkView/write-8         	 5910660	       191.7 ns/op	      16 B/op	       1 allocs/op
-BenchmarkView/move-8          	    8253	    138149 ns/op	       0 B/op	       0 allocs/op
-BenchmarkView/notify-8        	 6024670	       197.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkView/write-8         	 7208314	       174.0 ns/op	       8 B/op	       1 allocs/op
+BenchmarkView/move-8          	    9231	    120567 ns/op	       0 B/op	       0 allocs/op
+BenchmarkView/notify-8        	 7274684	       170.2 ns/op	       8 B/op	       1 allocs/op
 */
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
@@ -28,7 +28,7 @@ func BenchmarkView(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			v.WriteAt(152, 52, Tile{})
+			v.WriteAt(152, 52, Tile(0))
 		}
 	})
 
@@ -84,30 +84,30 @@ func TestView(t *testing.T) {
 	assert.Equal(t, 100, int(c))
 
 	// Update a tile in view
-	tile, _ := v.At(5, 5)
-	tile[0] = 55
-	v.WriteAt(5, 5, tile)
+	cursor, _ := v.At(5, 5)
+	before := cursor.Tile()
+	v.WriteAt(5, 5, Tile(55))
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
-	assert.Equal(t, tile, update.Tile)
+	assert.NotEqual(t, before, update.Tile)
 
 	// Merge a tile in view, but with zero mask (won't do anything)
-	tile, _ = v.At(5, 5)
-	tile[0] = 66
-	v.MergeAt(5, 5, tile, Tile{}) // zero mask
+	cursor, _ = v.At(5, 5)
+	before = cursor.Tile()
+	v.MergeAt(5, 5, Tile(66), Tile(0)) // zero mask
 	update = <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
-	assert.NotEqual(t, tile, update.Tile)
+	assert.Equal(t, before, update.Tile)
 
 	// Close the view
 	assert.NoError(t, v.Close())
-	v.WriteAt(5, 5, tile)
+	v.WriteAt(5, 5, Tile(66))
 	assert.Equal(t, 0, len(v.Inbox))
 }
 
 type counter int
 
-func (c *counter) count(p Point, tile Tile) {
+func (c *counter) count(p Point, tile Cursor) {
 	*c++
 }
 

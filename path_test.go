@@ -131,7 +131,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Tile) {})
+			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Cursor) {})
 		}
 	})
 
@@ -139,7 +139,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Tile) {})
+			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Cursor) {})
 		}
 	})
 
@@ -147,7 +147,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Tile) {})
+			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Cursor) {})
 		}
 	})
 }
@@ -157,7 +157,7 @@ func TestAround(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		var path []string
-		m.Around(At(2, 2), 3, costOf, func(p Point, tile Tile) {
+		m.Around(At(2, 2), 3, costOf, func(p Point, tile Cursor) {
 			path = append(path, p.String())
 		})
 		assert.Equal(t, 10, len(path))
@@ -216,7 +216,7 @@ func rand(i int) uint32 {
 
 // Cost estimation function
 func costOf(tile Tile) uint16 {
-	if (tile[0])&1 != 0 {
+	if (tile)&1 != 0 {
 		return 0 // Blocked
 	}
 	return 1
@@ -244,7 +244,7 @@ func mapFrom(name string) *Grid {
 			switch v.R {
 			case 255:
 			case 0:
-				m.WriteAt(x, y, Tile{0xff, 0, 0, 0, 0, 0})
+				m.WriteAt(x, y, Tile(0xff))
 			}
 
 		}
@@ -259,12 +259,12 @@ func plotPath(m *Grid, path []Point) string {
 		out[i] = make([]byte, m.Size.X)
 	}
 
-	m.Each(func(l Point, tile Tile) {
+	m.Each(func(l Point, tile Cursor) {
 		//println(l.String(), int(tile[0]))
 		switch {
 		case pointInPath(l, path):
 			out[l.Y][l.X] = 'x'
-		case tile[0]&1 != 0:
+		case tile.Tile()&1 != 0:
 			out[l.Y][l.X] = '.'
 		default:
 			out[l.Y][l.X] = ' '
@@ -297,9 +297,9 @@ func drawGrid(m *Grid, rect Rect) image.Image {
 
 	size := rect.Size()
 	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
-	m.Within(rect.Min, rect.Max, func(p Point, tile Tile) {
+	m.Within(rect.Min, rect.Max, func(p Point, tile Cursor) {
 		a := uint8(255)
-		if tile[0] == 1 {
+		if tile.Tile() == 1 {
 			a = 0
 		}
 

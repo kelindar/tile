@@ -47,9 +47,9 @@ func (v *View) Resize(box Rect, fn Iterator) {
 
 		// Callback for each new tile in the view
 		if fn != nil {
-			page.Each(func(p Point, tile Tile) {
+			page.Each(func(p Point, v Cursor) {
 				if !prev.Contains(p) && box.Contains(p) {
-					fn(p, tile)
+					fn(p, v)
 				}
 			})
 		}
@@ -79,7 +79,7 @@ func (v *View) Each(fn Iterator) {
 }
 
 // At returns the tile at a specified position.
-func (v *View) At(x, y int16) (Tile, bool) {
+func (v *View) At(x, y int16) (Cursor, bool) {
 	return v.Grid.At(x, y)
 }
 

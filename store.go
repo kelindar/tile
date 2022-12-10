@@ -8,11 +8,12 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
+	"unsafe"
 
 	"github.com/kelindar/iostream"
 )
 
-const tileDataSize = 54
+const tileDataSize = int(unsafe.Sizeof([9]Tile{}))
 
 // ---------------------------------- Stream ----------------------------------
 
@@ -60,7 +61,7 @@ func ReadFrom(src io.Reader) (grid *Grid, err error) {
 	grid = NewGrid(view.Max.X+1, view.Max.Y+1)
 	buf := make([]byte, tileDataSize)
 	grid.pagesWithin(view.Min, view.Max, func(page *page) {
-		if _, err := io.ReadFull(r, buf); err != nil {
+		if _, err = io.ReadFull(r, buf); err != nil {
 			return
 		}
 

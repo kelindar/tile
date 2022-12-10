@@ -41,12 +41,12 @@ func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 		current := unpackPoint(pCurr)
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor) {
 			if d := from.DistanceTo(next); d > distance {
 				return // Too far
 			}
 
-			if cost := costOf(nextTile); cost == 0 {
+			if cost := costOf(nextTile.Tile()); cost == 0 {
 				return // Blocked tile, ignore completely
 			}
 
@@ -97,8 +97,8 @@ func (m *Grid) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 		}
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile) {
-			cNext := costOf(nextTile)
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor) {
+			cNext := costOf(nextTile.Tile())
 			if cNext == 0 {
 				return // Blocked tile, ignore completely
 			}
