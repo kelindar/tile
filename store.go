@@ -13,7 +13,7 @@ import (
 	"github.com/kelindar/iostream"
 )
 
-const tileDataSize = int(unsafe.Sizeof([9]Tile{}))
+const tileDataSize = int(unsafe.Sizeof([9]Value{}))
 
 // ---------------------------------- Stream ----------------------------------
 
@@ -35,7 +35,8 @@ func (m *Grid[T]) WriteTo(dst io.Writer) (n int64, err error) {
 
 	// Write the grid data
 	m.pagesWithin(p1, p2, func(page *page[T]) {
-		if _, err := w.Write(page.Data()); err != nil {
+		buffer := (*[tileDataSize]byte)(unsafe.Pointer(&page.tiles))[:]
+		if _, err := w.Write(buffer); err != nil {
 			return
 		}
 	})
@@ -65,7 +66,7 @@ func ReadFrom[T comparable](src io.Reader) (grid *Grid[T], err error) {
 			return
 		}
 
-		copy(page.Data(), buf)
+		copy((*[tileDataSize]byte)(unsafe.Pointer(&page.tiles))[:], buf)
 	})
 	return
 }

@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type costFn = func(Tile) uint16
+type costFn = func(Value) uint16
 
 // Edge represents an edge of the path
 type edge struct {
@@ -17,7 +17,7 @@ type edge struct {
 }
 
 // Around performs a breadth first search around a point.
-func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Point, Cursor[T])) {
+func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Point, Tile[T])) {
 	start, ok := m.At(from.X, from.Y)
 	if !ok {
 		return
@@ -41,7 +41,7 @@ func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Poi
 		current := unpackPoint(pCurr)
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor[T]) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile[T]) {
 			if d := from.DistanceTo(next); d > distance {
 				return // Too far
 			}
@@ -97,7 +97,7 @@ func (m *Grid[T]) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 		}
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Cursor[T]) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile[T]) {
 			cNext := costOf(nextTile.Tile())
 			if cNext == 0 {
 				return // Blocked tile, ignore completely

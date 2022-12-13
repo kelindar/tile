@@ -28,7 +28,7 @@ func BenchmarkView(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			v.WriteAt(152, 52, Tile(0))
+			v.WriteAt(152, 52, Value(0))
 		}
 	})
 
@@ -78,7 +78,7 @@ func TestView(t *testing.T) {
 	// Update a tile in view
 	cursor, _ := v.At(5, 5)
 	before := cursor.Tile()
-	v.WriteAt(5, 5, Tile(55))
+	v.WriteAt(5, 5, Value(55))
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
 	assert.NotEqual(t, before, update.New)
@@ -86,14 +86,14 @@ func TestView(t *testing.T) {
 	// Merge a tile in view, but with zero mask (won't do anything)
 	cursor, _ = v.At(5, 5)
 	before = cursor.Tile()
-	v.MergeAt(5, 5, Tile(66), Tile(0)) // zero mask
+	v.MergeAt(5, 5, Value(66), Value(0)) // zero mask
 	update = <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
 	assert.Equal(t, before, update.New)
 
 	// Close the view
 	assert.NoError(t, v.Close())
-	v.WriteAt(5, 5, Tile(66))
+	v.WriteAt(5, 5, Value(66))
 	assert.Equal(t, 0, len(v.Inbox))
 }
 
@@ -145,18 +145,18 @@ func TestStateUpdates(t *testing.T) {
 
 	// Update a tile in view
 	cursor, _ := v.At(5, 5)
-	cursor.Write(Tile(0xF0))
+	cursor.Write(Value(0xF0))
 	assert.Equal(t, Update[string]{
 		Point: At(5, 5),
-		New:   Tile(0xF0),
+		New:   Value(0xF0),
 	}, <-v.Inbox)
 
 	// Add an object to an observed tile
 	cursor.Add("A")
 	assert.Equal(t, Update[string]{
 		Point: At(5, 5),
-		Old:   Tile(0xF0),
-		New:   Tile(0xF0),
+		Old:   Value(0xF0),
+		New:   Value(0xF0),
 		Add:   "A",
 	}, <-v.Inbox)
 
@@ -164,8 +164,8 @@ func TestStateUpdates(t *testing.T) {
 	cursor.Del("A")
 	assert.Equal(t, Update[string]{
 		Point: At(5, 5),
-		Old:   Tile(0xF0),
-		New:   Tile(0xF0),
+		Old:   Value(0xF0),
+		New:   Value(0xF0),
 		Del:   "A",
 	}, <-v.Inbox)
 
@@ -173,8 +173,8 @@ func TestStateUpdates(t *testing.T) {
 	cursor.Merge(0xFF, 0x0F)
 	assert.Equal(t, Update[string]{
 		Point: At(5, 5),
-		Old:   Tile(0xF0),
-		New:   Tile(0xFF),
+		Old:   Value(0xF0),
+		New:   Value(0xFF),
 	}, <-v.Inbox)
 }
 
@@ -188,6 +188,6 @@ func (f fakeView[T]) onUpdate(e *Update[T]) {
 
 type counter int
 
-func (c *counter) count(p Point, tile Cursor[string]) {
+func (c *counter) count(p Point, tile Tile[string]) {
 	*c++
 }

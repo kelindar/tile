@@ -14,8 +14,8 @@ import (
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkStore/save-8         	    9068	    129974 ns/op	       8 B/op	       1 allocs/op
-BenchmarkStore/read-8         	    2967	    379663 ns/op	  647465 B/op	       8 allocs/op
+BenchmarkStore/save-8         	   14455	     81883 ns/op	       8 B/op	       1 allocs/op
+BenchmarkStore/read-8         	    2787	    399699 ns/op	  647421 B/op	       7 allocs/op
 */
 func BenchmarkStore(b *testing.B) {
 	m := mapFrom("300x300.png")

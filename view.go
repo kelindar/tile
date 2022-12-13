@@ -9,11 +9,11 @@ import (
 
 // Update represents a tile update notification.
 type Update[T comparable] struct {
-	Point      // The tile location
-	Old   Tile // Old tile value
-	New   Tile // New tile value
-	Add   T    // An object was added to the tile
-	Del   T    // An object was removed from the tile
+	Point       // The tile location
+	Old   Value // Old tile value
+	New   Value // New tile value
+	Add   T     // An object was added to the tile
+	Del   T     // An object was removed from the tile
 }
 
 // View represents a view which can monitor a collection of tiles.
@@ -24,7 +24,7 @@ type View[T comparable] struct {
 }
 
 // Resize resizes the viewport.
-func (v *View[T]) Resize(box Rect, fn func(Point, Cursor[T])) {
+func (v *View[T]) Resize(box Rect, fn func(Point, Tile[T])) {
 	owner := v.Grid // The parent map
 	prev := v.rect  // Previous bounding box
 	v.rect = box    // New bounding box
@@ -50,7 +50,7 @@ func (v *View[T]) Resize(box Rect, fn func(Point, Cursor[T])) {
 
 		// Callback for each new tile in the view
 		if fn != nil {
-			page.Each(v.Grid, func(p Point, v Cursor[T]) {
+			page.Each(v.Grid, func(p Point, v Tile[T]) {
 				if !prev.Contains(p) && box.Contains(p) {
 					fn(p, v)
 				}
@@ -60,7 +60,7 @@ func (v *View[T]) Resize(box Rect, fn func(Point, Cursor[T])) {
 }
 
 // MoveBy moves the viewport towards a particular direction.
-func (v *View[T]) MoveBy(x, y int16, fn func(Point, Cursor[T])) {
+func (v *View[T]) MoveBy(x, y int16, fn func(Point, Tile[T])) {
 	v.Resize(Rect{
 		Min: v.rect.Min.Add(At(x, y)),
 		Max: v.rect.Max.Add(At(x, y)),
@@ -68,7 +68,7 @@ func (v *View[T]) MoveBy(x, y int16, fn func(Point, Cursor[T])) {
 }
 
 // MoveAt moves the viewport to a specific coordinate.
-func (v *View[T]) MoveAt(nw Point, fn func(Point, Cursor[T])) {
+func (v *View[T]) MoveAt(nw Point, fn func(Point, Tile[T])) {
 	size := v.rect.Max.Subtract(v.rect.Min)
 	v.Resize(Rect{
 		Min: nw,
@@ -77,23 +77,23 @@ func (v *View[T]) MoveAt(nw Point, fn func(Point, Cursor[T])) {
 }
 
 // Each iterates over all of the tiles in the view.
-func (v *View[T]) Each(fn func(Point, Cursor[T])) {
+func (v *View[T]) Each(fn func(Point, Tile[T])) {
 	v.Grid.Within(v.rect.Min, v.rect.Max, fn)
 }
 
 // At returns the tile at a specified position.
-func (v *View[T]) At(x, y int16) (Cursor[T], bool) {
+func (v *View[T]) At(x, y int16) (Tile[T], bool) {
 	return v.Grid.At(x, y)
 }
 
 // WriteAt updates the entire tile at a specific coordinate.
-func (v *View[T]) WriteAt(x, y int16, tile Tile) {
+func (v *View[T]) WriteAt(x, y int16, tile Value) {
 	v.Grid.WriteAt(x, y, tile)
 }
 
 // MergeAt updates the bits of tile at a specific coordinate. The bits are specified
 // by the mask. The bits that need to be updated should be flipped on in the mask.
-func (v *View[T]) MergeAt(x, y int16, tile, mask Tile) {
+func (v *View[T]) MergeAt(x, y int16, tile, mask Value) {
 	v.Grid.MergeAt(x, y, tile, mask)
 }
 
