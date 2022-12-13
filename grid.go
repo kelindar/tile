@@ -15,7 +15,7 @@ type Grid[T comparable] struct {
 	pages      []page[T] // The pages of the map
 	pageWidth  int16     // The max page width
 	pageHeight int16     // The max page height
-	observers  pubsub    // The map of observers
+	observers  pubsub[T] // The map of observers
 	Size       Point     // The map size
 }
 
@@ -36,7 +36,7 @@ func NewGridOf[T comparable](width, height int16) *Grid[T] {
 		pages:      pages,
 		pageWidth:  width,
 		pageHeight: height,
-		observers:  pubsub{},
+		observers:  pubsub[T]{},
 		Size:       At(width*3, height*3),
 	}
 
@@ -55,7 +55,7 @@ func NewGridOf[T comparable](width, height int16) *Grid[T] {
 func (m *Grid[T]) Each(fn func(Point, Cursor[T])) {
 	until := int(m.pageHeight) * int(m.pageWidth)
 	for i := 0; i < until; i++ {
-		m.pages[i].Each(fn)
+		m.pages[i].Each(m, fn)
 	}
 }
 
@@ -63,7 +63,7 @@ func (m *Grid[T]) Each(fn func(Point, Cursor[T])) {
 // north-west and south-east coordinates.
 func (m *Grid[T]) Within(nw, se Point, fn func(Point, Cursor[T])) {
 	m.pagesWithin(nw, se, func(page *page[T]) {
-		page.Each(func(p Point, v Cursor[T]) {
+		page.Each(m, func(p Point, v Cursor[T]) {
 			if p.Within(nw, se) {
 				fn(p, v)
 			}
@@ -88,7 +88,7 @@ func (m *Grid[T]) pagesWithin(nw, se Point, fn func(*page[T])) {
 // At returns the tile at a specified position
 func (m *Grid[T]) At(x, y int16) (Cursor[T], bool) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		return m.pageAt(x/3, y/3).At(x, y), true
+		return m.pageAt(x/3, y/3).At(m, x, y), true
 	}
 
 	return Cursor[T]{}, false
@@ -97,9 +97,7 @@ func (m *Grid[T]) At(x, y int16) (Cursor[T], bool) {
 // WriteAt updates the entire tile value at a specific coordinate
 func (m *Grid[T]) WriteAt(x, y int16, tile Tile) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		if m.pageAt(x/3, y/3).SetTile(x, y, tile) {
-			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), tile)
-		}
+		m.pageAt(x/3, y/3).writeTile(m, uint8((y%3)*3+(x%3)), tile)
 	}
 }
 
@@ -107,17 +105,7 @@ func (m *Grid[T]) WriteAt(x, y int16, tile Tile) {
 // by the mask. The bits that need to be updated should be flipped on in the mask.
 func (m *Grid[T]) MergeAt(x, y int16, tile, mask Tile) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		if v, ok := m.pageAt(x/3, y/3).SetBits(x, y, tile, mask); ok {
-			m.observers.Notify(At(x/3*3, y/3*3), At(x, y), v)
-		}
-	}
-}
-
-// NotifyAt triggers the notification event for all of the observers at a given tile.
-func (m *Grid[T]) NotifyAt(x, y int16) {
-	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		m.observers.Notify(At(x/3*3, y/3*3), At(x, y),
-			m.pageAt(x/3, y/3).Get(x, y))
+		m.pageAt(x/3, y/3).mergeTile(m, uint8((y%3)*3+(x%3)), tile, mask)
 	}
 }
 
@@ -134,22 +122,22 @@ func (m *Grid[T]) Neighbors(x, y int16, fn func(Point, Cursor[T])) {
 
 	// Get the North
 	if y > 0 {
-		fn(At(x, y-1), m.pageAt(nX, nY).At(x, y-1))
+		fn(At(x, y-1), m.pageAt(nX, nY).At(m, x, y-1))
 	}
 
 	// Get the East
 	if eX < m.pageWidth {
-		fn(At(x+1, y), m.pageAt(eX, eY).At(x+1, y))
+		fn(At(x+1, y), m.pageAt(eX, eY).At(m, x+1, y))
 	}
 
 	// Get the South
 	if sY < m.pageHeight {
-		fn(At(x, y+1), m.pageAt(sX, sY).At(x, y+1))
+		fn(At(x, y+1), m.pageAt(sX, sY).At(m, x, y+1))
 	}
 
 	// Get the West
 	if x > 0 {
-		fn(At(x-1, y), m.pageAt(wX, wY).At(x-1, y))
+		fn(At(x-1, y), m.pageAt(wX, wY).At(m, x-1, y))
 	}
 }
 
@@ -157,7 +145,7 @@ func (m *Grid[T]) Neighbors(x, y int16, fn func(Point, Cursor[T])) {
 func (m *Grid[T]) View(rect Rect, fn func(Point, Cursor[T])) *View[T] {
 	view := &View[T]{
 		Grid:  m,
-		Inbox: make(chan Update, 16),
+		Inbox: make(chan Update[T], 32),
 		rect:  NewRect(-1, -1, -1, -1),
 	}
 
@@ -200,13 +188,8 @@ func (p *page[T]) tileAt(idx uint8) Tile {
 	return Tile(atomic.LoadUint32((*uint32)(&p.tiles[idx])))
 }
 
-// writeTile stores the tile and return  whether tile is observed or not
-func (p *page[T]) writeTile(idx uint8, tile Tile) bool {
-	atomic.StoreUint32((*uint32)(&p.tiles[idx]), uint32(tile))
-	return p.isObserved()
-}
-
-func (p *page[T]) isObserved() bool {
+// IsObserved returns whether the tile is observed or not
+func (p *page[T]) IsObserved() bool {
 	return (atomic.LoadUint32(&p.flags))&1 != 0
 }
 
@@ -215,51 +198,28 @@ func (p *page[T]) Bounds() Rect {
 	return Rect{p.point, At(p.point.X+3, p.point.Y+3)}
 }
 
-// SetTile updates the tile at a specific coordinate
-func (p *page[T]) SetTile(x, y int16, tile Tile) bool {
-	return p.writeTile(uint8((y%3)*3+(x%3)), tile)
-}
-
-// SetBits updates certain tile bits at a specific coordinate
-func (p *page[T]) SetBits(x, y int16, tile, mask Tile) (Tile, bool) {
-	i := uint8((y%3)*3 + (x % 3))
-
-	// Merge current value with the tile and mask
-	value := p.tileAt(i)
-	merge := (value &^ mask) | (tile & mask)
-
-	// Swap, if we're not able to re-merge again
-	for !atomic.CompareAndSwapUint32((*uint32)(&p.tiles[i]), uint32(value), uint32(merge)) {
-		value = p.tileAt(i)
-		merge = (value &^ mask) | (tile & mask)
-	}
-
-	// Return the merged tile data and whether tile is observed or not
-	return merge, p.isObserved()
-}
-
 // Get gets a tile at a specific coordinate.
 func (p *page[T]) Get(x, y int16) Tile {
 	return p.tileAt(uint8((y%3)*3 + (x % 3)))
 }
 
 // At returns a cursor at a specific coordinate
-func (p *page[T]) At(x, y int16) Cursor[T] {
-	return Cursor[T]{data: p, idx: uint8((y%3)*3 + (x % 3))}
+func (p *page[T]) At(grid *Grid[T], x, y int16) Cursor[T] {
+	return Cursor[T]{grid: grid, data: p, idx: uint8((y%3)*3 + (x % 3))}
 }
 
 // Each iterates over all of the tiles in the page.
-func (p *page[T]) Each(fn func(Point, Cursor[T])) {
+func (p *page[T]) Each(grid *Grid[T], fn func(Point, Cursor[T])) {
 	x, y := p.point.X, p.point.Y
-	fn(Point{x, y}, Cursor[T]{data: p, idx: 0})         // NW
-	fn(Point{x + 1, y}, Cursor[T]{data: p, idx: 1})     // N
-	fn(Point{x + 2, y}, Cursor[T]{data: p, idx: 2})     // NE
-	fn(Point{x, y + 1}, Cursor[T]{data: p, idx: 3})     // W
-	fn(Point{x + 1, y + 1}, Cursor[T]{data: p, idx: 4}) // C
-	fn(Point{x + 2, y + 1}, Cursor[T]{data: p, idx: 5}) // E
-	fn(Point{x, y + 2}, Cursor[T]{data: p, idx: 6})     // SW
-	fn(Point{x + 1, y + 2}, Cursor[T]{data: p, idx: 7}) // S
-	fn(Point{x + 2, y + 2}, Cursor[T]{data: p, idx: 8}) // SE
+	fn(Point{x, y}, Cursor[T]{grid: grid, data: p, idx: 0})         // NW
+	fn(Point{x + 1, y}, Cursor[T]{grid: grid, data: p, idx: 1})     // N
+	fn(Point{x + 2, y}, Cursor[T]{grid: grid, data: p, idx: 2})     // NE
+	fn(Point{x, y + 1}, Cursor[T]{grid: grid, data: p, idx: 3})     // W
+	fn(Point{x + 1, y + 1}, Cursor[T]{grid: grid, data: p, idx: 4}) // C
+	fn(Point{x + 2, y + 1}, Cursor[T]{grid: grid, data: p, idx: 5}) // E
+	fn(Point{x, y + 2}, Cursor[T]{grid: grid, data: p, idx: 6})     // SW
+	fn(Point{x + 1, y + 2}, Cursor[T]{grid: grid, data: p, idx: 7}) // S
+	fn(Point{x + 2, y + 2}, Cursor[T]{grid: grid, data: p, idx: 8}) // SE
 }
 
 // SetObserved sets the observed flag on the page
@@ -301,12 +261,101 @@ func (p *page[T]) Data() []byte {
 	return *(*[]byte)(unsafe.Pointer(&out))
 }
 
+// ---------------------------------- Mutations ----------------------------------
+
+// writeTile stores the tile and return  whether tile is observed or not
+func (p *page[T]) writeTile(grid *Grid[T], idx uint8, tile Tile) {
+	value := p.tileAt(idx)
+	for !atomic.CompareAndSwapUint32((*uint32)(&p.tiles[idx]), uint32(value), uint32(tile)) {
+		value = p.tileAt(idx)
+	}
+
+	// If observed, notify the observers of the tile
+	if p.IsObserved() {
+		grid.observers.Notify(p.point, &Update[T]{
+			Point: pointOf(p.point, idx),
+			Old:   value,
+			New:   tile,
+		})
+	}
+}
+
+// mergeTile atomically merges the tile bits given a mask
+func (p *page[T]) mergeTile(grid *Grid[T], idx uint8, tile, mask Tile) Tile {
+	value := p.tileAt(idx)
+	merge := (value &^ mask) | (tile & mask)
+
+	// Swap, if we're not able to re-merge again
+	for !atomic.CompareAndSwapUint32((*uint32)(&p.tiles[idx]), uint32(value), uint32(merge)) {
+		value = p.tileAt(idx)
+		merge = (value &^ mask) | (tile & mask)
+	}
+
+	// If observed, notify the observers of the tile
+	if p.IsObserved() {
+		grid.observers.Notify(p.point, &Update[T]{
+			Point: pointOf(p.point, idx),
+			Old:   value,
+			New:   merge,
+		})
+	}
+
+	// Return the merged tile data
+	return merge
+}
+
+// addObject adds object to the set
+func (p *page[T]) addObject(grid *Grid[T], idx uint8, object T) {
+	p.Lock()
+
+	// Lazily initialize the map, as most pages might not have anything stored
+	// in them (e.g. water or empty tile)
+	if p.state == nil {
+		p.state = make(map[T]uint8)
+	}
+
+	p.state[object] = uint8(idx)
+	p.Unlock()
+
+	// If observed, notify the observers of the tile
+	if p.IsObserved() {
+		value := p.tileAt(idx)
+		grid.observers.Notify(p.point, &Update[T]{
+			Point: pointOf(p.point, idx),
+			Old:   value,
+			New:   value,
+			Add:   object,
+		})
+	}
+}
+
+// delObject removes the object from the set
+func (p *page[T]) delObject(grid *Grid[T], idx uint8, object T) {
+	p.Lock()
+	if p.state != nil {
+		delete(p.state, object)
+	}
+	p.Unlock()
+
+	// If observed, notify the observers of the tile
+	if p.IsObserved() {
+		value := p.tileAt(idx)
+		grid.observers.Notify(p.point, &Update[T]{
+			Point: pointOf(p.point, idx),
+			Old:   value,
+			New:   value,
+			Del:   object,
+		})
+	}
+}
+
 // ---------------------------------- Cursor ----------------------------------
 
 // Cursor represents an iterator over all state objects at a particular location.
 type Cursor[T comparable] struct {
+	grid *Grid[T]
 	data *page[T]
-	idx  uint8
+	idx  uint8 // tile index
 }
 
 // Count returns number of objects at the current tile.
@@ -342,23 +391,29 @@ func (c Cursor[T]) Range(fn func(T) error) error {
 
 // Add adds object to the set
 func (c Cursor[T]) Add(v T) {
-	c.data.Lock()
-	defer c.data.Unlock()
-
-	// Lazily initialize the map, as most pages might not have anything stored
-	// in them (e.g. water or empty tile)
-	if c.data.state == nil {
-		c.data.state = make(map[T]uint8)
-	}
-
-	c.data.state[v] = uint8(c.idx)
+	c.data.addObject(c.grid, c.idx, v)
 }
 
 // Del removes the object from the set
 func (c Cursor[T]) Del(v T) {
-	c.data.Lock()
-	defer c.data.Unlock()
-	if c.data.state != nil {
-		delete(c.data.state, v)
+	c.data.delObject(c.grid, c.idx, v)
+}
+
+// Write updates the entire tile value.
+func (c Cursor[T]) Write(tile Tile) {
+	c.data.writeTile(c.grid, c.idx, tile)
+}
+
+// Merge updates the bits of tile. The bits are specified by the mask. The bits
+// that need to be updated should be flipped on in the mask.
+func (c Cursor[T]) Merge(tile, mask Tile) Tile {
+	return c.data.mergeTile(c.grid, c.idx, tile, mask)
+}
+
+// pointOf returns the point given an index
+func pointOf(page Point, idx uint8) Point {
+	return Point{
+		X: page.X + int16(idx)%3,
+		Y: page.Y + int16(idx)/3,
 	}
 }

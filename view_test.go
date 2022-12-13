@@ -44,14 +44,6 @@ func BenchmarkView(b *testing.B) {
 			v.MoveAt(locs[n%2], nil)
 		}
 	})
-
-	b.Run("notify", func(b *testing.B) {
-		b.ReportAllocs()
-		b.ResetTimer()
-		for n := 0; n < b.N; n++ {
-			m.NotifyAt(150, 50)
-		}
-	})
 }
 
 func TestView(t *testing.T) {
@@ -89,7 +81,7 @@ func TestView(t *testing.T) {
 	v.WriteAt(5, 5, Tile(55))
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
-	assert.NotEqual(t, before, update.Tile)
+	assert.NotEqual(t, before, update.New)
 
 	// Merge a tile in view, but with zero mask (won't do anything)
 	cursor, _ = v.At(5, 5)
@@ -97,7 +89,7 @@ func TestView(t *testing.T) {
 	v.MergeAt(5, 5, Tile(66), Tile(0)) // zero mask
 	update = <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
-	assert.Equal(t, before, update.Tile)
+	assert.Equal(t, before, update.New)
 
 	// Close the view
 	assert.NoError(t, v.Close())
@@ -112,23 +104,23 @@ func (c *counter) count(p Point, tile Cursor[string]) {
 }
 
 func TestObservers(t *testing.T) {
-	ev := newObservers()
+	ev := newObservers[uint32]()
 	assert.NotNil(t, ev)
 
 	// Subscriber which does nothing
-	var sub1 fakeView = func(e *Update) {}
+	var sub1 fakeView[uint32] = func(e *Update[uint32]) {}
 	ev.Subscribe(&sub1)
 
 	// Counting subscriber
 	var count int
-	var sub2 fakeView = func(e *Update) {
+	var sub2 fakeView[uint32] = func(e *Update[uint32]) {
 		count += int(e.X)
 	}
 	ev.Subscribe(&sub2)
 
-	ev.Notify(&Update{Point: At(1, 0)})
-	ev.Notify(&Update{Point: At(2, 0)})
-	ev.Notify(&Update{Point: At(3, 0)})
+	ev.Notify(&Update[uint32]{Point: At(1, 0)})
+	ev.Notify(&Update[uint32]{Point: At(2, 0)})
+	ev.Notify(&Update[uint32]{Point: At(3, 0)})
 
 	for count < 6 {
 		time.Sleep(1 * time.Millisecond)
@@ -137,34 +129,19 @@ func TestObservers(t *testing.T) {
 	assert.Equal(t, 6, count)
 	ev.Unsubscribe(&sub2)
 
-	ev.Notify(&Update{Point: At(2, 0)})
+	ev.Notify(&Update[uint32]{Point: At(2, 0)})
 	assert.Equal(t, 6, count)
 }
 
 func TestObserversNil(t *testing.T) {
 	assert.NotPanics(t, func() {
-		var ev *observers
-		ev.Notify(&Update{Point: At(1, 0)})
+		var ev *observers[uint32]
+		ev.Notify(&Update[uint32]{Point: At(1, 0)})
 	})
 }
 
-func TestNotifyAt(t *testing.T) {
-	m := mapFrom("300x300.png")
+type fakeView[T comparable] func(*Update[T])
 
-	// Create a new view
-	c := counter(0)
-	v := m.View(NewRect(0, 0, 99, 99), c.count)
-	assert.NotNil(t, v)
-	assert.Equal(t, 10000, int(c))
-
-	m.NotifyAt(1, 1)
-	update := <-v.Inbox
-	assert.Equal(t, int16(1), update.X)
-	assert.Equal(t, int16(1), update.Y)
-}
-
-type fakeView func(*Update)
-
-func (f fakeView) onUpdate(e *Update) {
+func (f fakeView[T]) onUpdate(e *Update[T]) {
 	f(e)
 }

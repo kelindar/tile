@@ -8,16 +8,19 @@ import (
 )
 
 // Update represents a tile update notification.
-type Update struct {
-	Point // The tile location
-	Tile  // The tile data
+type Update[T comparable] struct {
+	Point      // The tile location
+	Old   Tile // Old tile value
+	New   Tile // New tile value
+	Add   T    // An object was added to the tile
+	Del   T    // An object was removed from the tile
 }
 
 // View represents a view which can monitor a collection of tiles.
 type View[T comparable] struct {
-	Grid  *Grid[T]    // The associated map
-	Inbox chan Update // The update inbox for the view
-	rect  Rect        // The view box
+	Grid  *Grid[T]       // The associated map
+	Inbox chan Update[T] // The update inbox for the view
+	rect  Rect           // The view box
 }
 
 // Resize resizes the viewport.
@@ -47,7 +50,7 @@ func (v *View[T]) Resize(box Rect, fn func(Point, Cursor[T])) {
 
 		// Callback for each new tile in the view
 		if fn != nil {
-			page.Each(func(p Point, v Cursor[T]) {
+			page.Each(v.Grid, func(p Point, v Cursor[T]) {
 				if !prev.Contains(p) && box.Contains(p) {
 					fn(p, v)
 				}
@@ -105,7 +108,7 @@ func (v *View[T]) Close() error {
 }
 
 // onUpdate occurs when a tile has updated.
-func (v *View[T]) onUpdate(ev *Update) {
+func (v *View[T]) onUpdate(ev *Update[T]) {
 	if v.rect.Contains(ev.Point) {
 		v.Inbox <- *ev // (copy)
 	}
@@ -114,40 +117,37 @@ func (v *View[T]) onUpdate(ev *Update) {
 // -----------------------------------------------------------------------------
 
 // observer represents a tile update observer.
-type observer interface {
-	onUpdate(*Update)
+type observer[T comparable] interface {
+	onUpdate(*Update[T])
 }
 
 // Pubsub represents a publish/subscribe layer for observers.
-type pubsub struct {
+type pubsub[T comparable] struct {
 	m sync.Map
 }
 
 // Notify notifies listeners of an update that happened.
-func (p *pubsub) Notify(page, point Point, tile Tile) {
+func (p *pubsub[T]) Notify(page Point, ev *Update[T]) {
 	if v, ok := p.m.Load(page.Integer()); ok {
-		v.(*observers).Notify(&Update{
-			Point: point,
-			Tile:  tile,
-		})
+		v.(*observers[T]).Notify(ev)
 	}
 }
 
 // Subscribe registers an event listener on a system
-func (p *pubsub) Subscribe(at Point, sub observer) bool {
+func (p *pubsub[T]) Subscribe(at Point, sub observer[T]) bool {
 	if v, ok := p.m.Load(at.Integer()); ok {
-		return v.(*observers).Subscribe(sub)
+		return v.(*observers[T]).Subscribe(sub)
 	}
 
 	// Slow path
-	v, _ := p.m.LoadOrStore(at.Integer(), newObservers())
-	return v.(*observers).Subscribe(sub)
+	v, _ := p.m.LoadOrStore(at.Integer(), newObservers[T]())
+	return v.(*observers[T]).Subscribe(sub)
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (p *pubsub) Unsubscribe(at Point, sub observer) bool {
+func (p *pubsub[T]) Unsubscribe(at Point, sub observer[T]) bool {
 	if v, ok := p.m.Load(at.Integer()); ok {
-		return v.(*observers).Unsubscribe(sub)
+		return v.(*observers[T]).Unsubscribe(sub)
 	}
 	return false
 }
@@ -156,20 +156,20 @@ func (p *pubsub) Unsubscribe(at Point, sub observer) bool {
 
 // Observers represents a change notifier which notifies the subscribers when
 // a specific tile is updated.
-type observers struct {
+type observers[T comparable] struct {
 	sync.Mutex
-	subs []observer
+	subs []observer[T]
 }
 
 // newObservers creates a new instance of an change observer.
-func newObservers() *observers {
-	return &observers{
-		subs: make([]observer, 0, 8),
+func newObservers[T comparable]() *observers[T] {
+	return &observers[T]{
+		subs: make([]observer[T], 0, 8),
 	}
 }
 
 // Notify notifies listeners of an update that happened.
-func (s *observers) Notify(ev *Update) {
+func (s *observers[T]) Notify(ev *Update[T]) {
 	if s == nil {
 		return
 	}
@@ -185,7 +185,7 @@ func (s *observers) Notify(ev *Update) {
 }
 
 // Subscribe registers an event listener on a system
-func (s *observers) Subscribe(sub observer) bool {
+func (s *observers[T]) Subscribe(sub observer[T]) bool {
 	s.Lock()
 	defer s.Unlock()
 	s.subs = append(s.subs, sub)
@@ -193,7 +193,7 @@ func (s *observers) Subscribe(sub observer) bool {
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (s *observers) Unsubscribe(sub observer) bool {
+func (s *observers[T]) Unsubscribe(sub observer[T]) bool {
 	s.Lock()
 	defer s.Unlock()
 

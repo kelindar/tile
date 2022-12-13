@@ -12,7 +12,7 @@
 
 This repository contains a 2D tile map engine which is built with data and cache friendly ways. My main goal here is to provide a simple, high performance library to handle large scale tile maps in games.
 
-- **Compact**. Each tile is 6 bytes long and each grid page is 64-bytes long, which means a grid of 3000x3000 should take around 64MB of memory.
+- **Compact**. Each tile is 4 bytes long and each grid page is 64-bytes long, which means a grid of 3000x3000 should take around 64MB of memory.
 - **Thread-safe**. The grid is thread-safe and can be updated through provided update function. This allows multiple goroutines to read/write to the grid concurrently without any contentions. There is a spinlock per tile page protecting tile access.
 - **Views & observers**. When a tile on the grid is updated, viewers of the tile will be notified of the update and can react to the changes. The idea is to allow you to build more complex, reactive systems on top of the grid.
 - **Zero-allocation** (or close to it) traversal of the grid. The grid is pre-allocated entirely and this library provides a few ways of traversing it.

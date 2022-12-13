@@ -4,6 +4,7 @@
 package tile
 
 import (
+	"fmt"
 	"io"
 	"testing"
 	"unsafe"
@@ -319,4 +320,38 @@ func TestStateRangeErr(t *testing.T) {
 			return io.EOF
 		}))
 	})
+}
+
+func TestPointOf(t *testing.T) {
+	truthTable := func(x, y int16, idx uint8) (int16, int16) {
+		switch idx {
+		case 0:
+			return x, y
+		case 1:
+			return x + 1, y
+		case 2:
+			return x + 2, y
+		case 3:
+			return x, y + 1
+		case 4:
+			return x + 1, y + 1
+		case 5:
+			return x + 2, y + 1
+		case 6:
+			return x, y + 2
+		case 7:
+			return x + 1, y + 2
+		case 8:
+			return x + 2, y + 2
+		default:
+			return x, y
+		}
+	}
+
+	for i := 0; i < 9; i++ {
+		at := pointOf(At(0, 0), uint8(i))
+		x, y := truthTable(0, 0, uint8(i))
+		assert.Equal(t, x, at.X, fmt.Sprintf("idx=%v", i))
+		assert.Equal(t, y, at.Y, fmt.Sprintf("idx=%v", i))
+	}
 }
