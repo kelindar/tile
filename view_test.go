@@ -97,12 +97,6 @@ func TestView(t *testing.T) {
 	assert.Equal(t, 0, len(v.Inbox))
 }
 
-type counter int
-
-func (c *counter) count(p Point, tile Cursor[string]) {
-	*c++
-}
-
 func TestObservers(t *testing.T) {
 	ev := newObservers[uint32]()
 	assert.NotNil(t, ev)
@@ -140,8 +134,60 @@ func TestObserversNil(t *testing.T) {
 	})
 }
 
+func TestStateUpdates(t *testing.T) {
+	m := mapFrom("300x300.png")
+
+	// Create a new view
+	c := counter(0)
+	v := m.View(NewRect(0, 0, 9, 9), c.count)
+	assert.NotNil(t, v)
+	assert.Equal(t, 100, int(c))
+
+	// Update a tile in view
+	cursor, _ := v.At(5, 5)
+	cursor.Write(Tile(0xF0))
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		New:   Tile(0xF0),
+	}, <-v.Inbox)
+
+	// Add an object to an observed tile
+	cursor.Add("A")
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Tile(0xF0),
+		New:   Tile(0xF0),
+		Add:   "A",
+	}, <-v.Inbox)
+
+	// Delete an object from an observed tile
+	cursor.Del("A")
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Tile(0xF0),
+		New:   Tile(0xF0),
+		Del:   "A",
+	}, <-v.Inbox)
+
+	// Merge a tile in view
+	cursor.Merge(0xFF, 0x0F)
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Tile(0xF0),
+		New:   Tile(0xFF),
+	}, <-v.Inbox)
+}
+
+// ---------------------------------- Mocks ----------------------------------
+
 type fakeView[T comparable] func(*Update[T])
 
 func (f fakeView[T]) onUpdate(e *Update[T]) {
 	f(e)
+}
+
+type counter int
+
+func (c *counter) count(p Point, tile Cursor[string]) {
+	*c++
 }

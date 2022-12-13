@@ -198,11 +198,6 @@ func (p *page[T]) Bounds() Rect {
 	return Rect{p.point, At(p.point.X+3, p.point.Y+3)}
 }
 
-// Get gets a tile at a specific coordinate.
-func (p *page[T]) Get(x, y int16) Tile {
-	return p.tileAt(uint8((y%3)*3 + (x % 3)))
-}
-
 // At returns a cursor at a specific coordinate
 func (p *page[T]) At(grid *Grid[T], x, y int16) Cursor[T] {
 	return Cursor[T]{grid: grid, data: p, idx: uint8((y%3)*3 + (x % 3))}

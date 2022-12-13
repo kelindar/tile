@@ -14,12 +14,12 @@ import (
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkGrid/each-8         	     804	   1393989 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/neighbors-8    	70167231	        17.26 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/within-8       	   29440	     41095 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/at-8           	410549198	         3.289 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/write-8        	154407861	         7.606 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/merge-8        	121471382	         9.839 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/each-8         	     862	   1365740 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/neighbors-8    	66562384	        17.94 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/within-8       	   30012	     40112 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/at-8           	396362580	         3.025 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/write-8        	127712601	         9.256 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/merge-8        	125377372	         9.410 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkGrid(b *testing.B) {
 	var d Cursor[uint32]
@@ -88,9 +88,9 @@ func BenchmarkGrid(b *testing.B) {
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkState/range-8         	11592040	       100.3 ns/op	       0 B/op	       0 allocs/op
-BenchmarkState/add-8           	50770226	        25.32 ns/op	       0 B/op	       0 allocs/op
-BenchmarkState/del-8           	59029844	        20.92 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/range-8         	11211600	       103.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/add-8           	41380593	        29.00 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/del-8           	54474884	        21.79 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkState(b *testing.B) {
 	m := NewGridOf[int](768, 768)
