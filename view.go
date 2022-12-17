@@ -94,7 +94,7 @@ func (v *View[T]) WriteAt(x, y int16, tile Value) {
 // MergeAt updates the bits of tile at a specific coordinate. The bits are specified
 // by the mask. The bits that need to be updated should be flipped on in the mask.
 func (v *View[T]) MergeAt(x, y int16, tile, mask Value) {
-	v.Grid.MergeAt(x, y, tile, mask)
+	v.Grid.MaskAt(x, y, tile, mask)
 }
 
 // Close closes the view and unsubscribes from everything.

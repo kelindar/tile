@@ -6,6 +6,7 @@ package tile
 import (
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"unsafe"
 
@@ -81,7 +82,18 @@ func BenchmarkGrid(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.MergeAt(100, 100, Value(0), Value(1))
+			m.MergeAt(100, 100, func(v Value) Value {
+				v += 1
+				return v
+			})
+		}
+	})
+
+	b.Run("mask", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			m.MaskAt(100, 100, Value(0), Value(1))
 		}
 	})
 }
@@ -234,7 +246,7 @@ func TestNeighbors(t *testing.T) {
 	for _, tc := range tests {
 		var out []string
 		m.Neighbors(tc.x, tc.y, func(_ Point, tile Tile[string]) {
-			loc := unpackPoint(uint32(tile.Tile()))
+			loc := unpackPoint(uint32(tile.Value()))
 			out = append(out, loc.String())
 		})
 		assert.ElementsMatch(t, tc.expect, out)
@@ -252,14 +264,14 @@ func TestAt(t *testing.T) {
 	// Make sure our At() and the position matches
 	m.Each(func(p Point, tile Tile[string]) {
 		at, _ := m.At(p.X, p.Y)
-		assert.Equal(t, p.String(), unpackPoint(uint32(at.Tile())).String())
+		assert.Equal(t, p.String(), unpackPoint(uint32(at.Value())).String())
 	})
 
 	// Make sure that points match
 	for y := int16(0); y < 9; y++ {
 		for x := int16(0); x < 9; x++ {
 			at, _ := m.At(x, y)
-			assert.Equal(t, At(x, y).String(), unpackPoint(uint32(at.Tile())).String())
+			assert.Equal(t, At(x, y).String(), unpackPoint(uint32(at.Value())).String())
 		}
 	}
 }
@@ -276,18 +288,18 @@ func TestUpdate(t *testing.T) {
 
 	// Assert the update
 	cursor, _ := m.At(8, 8)
-	assert.Equal(t, 81, int(cursor.Tile()))
+	assert.Equal(t, 81, int(cursor.Value()))
 
 	// 81 = 0b01010001
 	delta := Value(0b00101110) // change last 2 bits and should ignore other bits
-	m.MergeAt(8, 8, delta, Value(0b00000011))
+	m.MaskAt(8, 8, delta, Value(0b00000011))
 
 	// original: 0101 0001
 	// delta:    0010 1110
 	// mask:     0000 0011
 	// result:   0101 0010
 	cursor, _ = m.At(8, 8)
-	assert.Equal(t, 0b01010010, int(cursor.Tile()))
+	assert.Equal(t, 0b01010010, int(cursor.Value()))
 }
 
 func TestState(t *testing.T) {
@@ -354,4 +366,26 @@ func TestPointOf(t *testing.T) {
 		assert.Equal(t, x, at.X, fmt.Sprintf("idx=%v", i))
 		assert.Equal(t, y, at.Y, fmt.Sprintf("idx=%v", i))
 	}
+}
+
+func TestConcurrentMerge(t *testing.T) {
+	const count = 10000
+	var wg sync.WaitGroup
+	wg.Add(count)
+
+	m := NewGrid(9, 9)
+	for i := 0; i < count; i++ {
+		go func() {
+			m.MergeAt(1, 1, func(v Value) Value {
+				v += 1
+				return v
+			})
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	tile, ok := m.At(1, 1)
+	assert.True(t, ok)
+	assert.Equal(t, uint32(count), tile.Value())
 }

@@ -77,7 +77,7 @@ func TestView(t *testing.T) {
 
 	// Update a tile in view
 	cursor, _ := v.At(5, 5)
-	before := cursor.Tile()
+	before := cursor.Value()
 	v.WriteAt(5, 5, Value(55))
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
@@ -85,7 +85,7 @@ func TestView(t *testing.T) {
 
 	// Merge a tile in view, but with zero mask (won't do anything)
 	cursor, _ = v.At(5, 5)
-	before = cursor.Tile()
+	before = cursor.Value()
 	v.MergeAt(5, 5, Value(66), Value(0)) // zero mask
 	update = <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
@@ -169,12 +169,22 @@ func TestStateUpdates(t *testing.T) {
 		Del:   "A",
 	}, <-v.Inbox)
 
-	// Merge a tile in view
-	cursor.Merge(0xFF, 0x0F)
+	// Mask a tile in view
+	cursor.Mask(0xFF, 0x0F)
 	assert.Equal(t, Update[string]{
 		Point: At(5, 5),
 		Old:   Value(0xF0),
 		New:   Value(0xFF),
+	}, <-v.Inbox)
+
+	// Merge a tile in view
+	cursor.Merge(func(v Value) Value {
+		return 0xAA
+	})
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Value(0xFF),
+		New:   Value(0xAA),
 	}, <-v.Inbox)
 }
 

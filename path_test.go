@@ -168,6 +168,13 @@ func TestAround(t *testing.T) {
 	}
 }
 
+func TestAroundMiss(t *testing.T) {
+	m := mapFrom("9x9.png")
+	m.Around(At(20, 20), 3, costOf, func(p Point, tile Tile[string]) {
+		t.Fail()
+	})
+}
+
 // BenchmarkHeap-8   	   94454	     12303 ns/op	    3968 B/op	       5 allocs/op
 func BenchmarkHeap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
@@ -264,7 +271,7 @@ func plotPath(m *Grid[string], path []Point) string {
 		switch {
 		case pointInPath(l, path):
 			out[l.Y][l.X] = 'x'
-		case tile.Tile()&1 != 0:
+		case tile.Value()&1 != 0:
 			out[l.Y][l.X] = '.'
 		default:
 			out[l.Y][l.X] = ' '
@@ -299,7 +306,7 @@ func drawGrid(m *Grid[string], rect Rect) image.Image {
 	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
 	m.Within(rect.Min, rect.Max, func(p Point, tile Tile[string]) {
 		a := uint8(255)
-		if tile.Tile() == 1 {
+		if tile.Value() == 1 {
 			a = 0
 		}
 

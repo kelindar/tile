@@ -46,7 +46,7 @@ func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Poi
 				return // Too far
 			}
 
-			if cost := costOf(nextTile.Tile()); cost == 0 {
+			if cost := costOf(nextTile.Value()); cost == 0 {
 				return // Blocked tile, ignore completely
 			}
 
@@ -98,7 +98,7 @@ func (m *Grid[T]) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 
 		// Get all of the neighbors
 		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile[T]) {
-			cNext := costOf(nextTile.Tile())
+			cNext := costOf(nextTile.Value())
 			if cNext == 0 {
 				return // Blocked tile, ignore completely
 			}
@@ -185,7 +185,7 @@ func (h *heap32) Pop() (uint32, bool) {
 
 // Remove removes and returns the element at index i from the heap.
 // The complexity is O(log n) where n = h.Len().
-func (h *heap32) Remove(i int) uint32 {
+/*func (h *heap32) Remove(i int) uint32 {
 	n := h.Len() - 1
 	if n != i {
 		h.Swap(i, n)
@@ -194,7 +194,7 @@ func (h *heap32) Remove(i int) uint32 {
 		}
 	}
 	return h.pop()
-}
+}*/
 
 func (h *heap32) pop() uint32 {
 	old := *h

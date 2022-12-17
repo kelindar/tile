@@ -99,11 +99,18 @@ func (m *Grid[T]) WriteAt(x, y int16, tile Value) {
 	}
 }
 
-// MergeAt updates the bits of tile at a specific coordinate. The bits are specified
-// by the mask. The bits that need to be updated should be flipped on in the mask.
-func (m *Grid[T]) MergeAt(x, y int16, tile, mask Value) {
+// MaskAt atomically updates the bits of tile at a specific coordinate. The bits are
+// specified by the mask. The bits that need to be updated should be flipped on in the mask.
+func (m *Grid[T]) MaskAt(x, y int16, tile, mask Value) {
+	m.MergeAt(x, y, func(value Value) Value {
+		return (value &^ mask) | (tile & mask)
+	})
+}
+
+// Merge atomically merges the tile by applying a merging function at a specific coordinate.
+func (m *Grid[T]) MergeAt(x, y int16, merge func(Value) Value) {
 	if x >= 0 && y >= 0 && x < m.Size.X && y < m.Size.Y {
-		m.pageAt(x/3, y/3).mergeTile(m, uint8((y%3)*3+(x%3)), tile, mask)
+		m.pageAt(x/3, y/3).mergeTile(m, uint8((y%3)*3+(x%3)), merge)
 	}
 }
 
@@ -250,7 +257,7 @@ func (p *page[T]) Unlock() {
 // writeTile stores the tile and return  whether tile is observed or not
 func (p *page[T]) writeTile(grid *Grid[T], idx uint8, tile Value) {
 	value := p.tileAt(idx)
-	for !atomic.CompareAndSwapUint32((*uint32)(&p.tiles[idx]), uint32(value), uint32(tile)) {
+	for !atomic.CompareAndSwapUint32(&p.tiles[idx], uint32(value), uint32(tile)) {
 		value = p.tileAt(idx)
 	}
 
@@ -264,15 +271,15 @@ func (p *page[T]) writeTile(grid *Grid[T], idx uint8, tile Value) {
 	}
 }
 
-// mergeTile atomically merges the tile bits given a mask
-func (p *page[T]) mergeTile(grid *Grid[T], idx uint8, tile, mask Value) Value {
+// mergeTile atomically merges the tile bits given a function
+func (p *page[T]) mergeTile(grid *Grid[T], idx uint8, fn func(Value) Value) Value {
 	value := p.tileAt(idx)
-	merge := (value &^ mask) | (tile & mask)
+	merge := fn(value)
 
 	// Swap, if we're not able to re-merge again
-	for !atomic.CompareAndSwapUint32((*uint32)(&p.tiles[idx]), uint32(value), uint32(merge)) {
+	for !atomic.CompareAndSwapUint32(&p.tiles[idx], uint32(value), uint32(merge)) {
 		value = p.tileAt(idx)
-		merge = (value &^ mask) | (tile & mask)
+		merge = fn(value)
 	}
 
 	// If observed, notify the observers of the tile
@@ -337,9 +344,9 @@ func (p *page[T]) delObject(grid *Grid[T], idx uint8, object T) {
 
 // Tile represents an iterator over all state objects at a particular location.
 type Tile[T comparable] struct {
-	grid *Grid[T]
-	data *page[T]
-	idx  uint8 // tile index
+	grid *Grid[T] // grid pointer
+	data *page[T] // page pointer
+	idx  uint8    // tile index
 }
 
 // Count returns number of objects at the current tile.
@@ -354,8 +361,8 @@ func (c Tile[T]) Count() (count int) {
 	return
 }
 
-// Tile reads the tile information
-func (c Tile[T]) Tile() Value {
+// Value reads the tile information
+func (c Tile[T]) Value() Value {
 	return c.data.tileAt(c.idx)
 }
 
@@ -388,10 +395,17 @@ func (c Tile[T]) Write(tile Value) {
 	c.data.writeTile(c.grid, c.idx, tile)
 }
 
-// Merge updates the bits of tile. The bits are specified by the mask. The bits
+// Merge atomically merges the tile by applying a merging function.
+func (c Tile[T]) Merge(merge func(Value) Value) Value {
+	return c.data.mergeTile(c.grid, c.idx, merge)
+}
+
+// Mask updates the bits of tile. The bits are specified by the mask. The bits
 // that need to be updated should be flipped on in the mask.
-func (c Tile[T]) Merge(tile, mask Value) Value {
-	return c.data.mergeTile(c.grid, c.idx, tile, mask)
+func (c Tile[T]) Mask(tile, mask Value) Value {
+	return c.data.mergeTile(c.grid, c.idx, func(value Value) Value {
+		return (value &^ mask) | (tile & mask)
+	})
 }
 
 // pointOf returns the point given an index
