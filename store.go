@@ -8,16 +8,17 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
+	"unsafe"
 
 	"github.com/kelindar/iostream"
 )
 
-const tileDataSize = 54
+const tileDataSize = int(unsafe.Sizeof([9]Value{}))
 
 // ---------------------------------- Stream ----------------------------------
 
 // WriteTo writes the grid to a specific writer.
-func (m *Grid) WriteTo(dst io.Writer) (n int64, err error) {
+func (m *Grid[T]) WriteTo(dst io.Writer) (n int64, err error) {
 	p1 := At(0, 0)
 	p2 := At(m.Size.X-1, m.Size.Y-1)
 
@@ -33,8 +34,9 @@ func (m *Grid) WriteTo(dst io.Writer) (n int64, err error) {
 	}
 
 	// Write the grid data
-	m.pagesWithin(p1, p2, func(page *page) {
-		if _, err := w.Write(page.Data()); err != nil {
+	m.pagesWithin(p1, p2, func(page *page[T]) {
+		buffer := (*[tileDataSize]byte)(unsafe.Pointer(&page.tiles))[:]
+		if _, err := w.Write(buffer); err != nil {
 			return
 		}
 	})
@@ -42,7 +44,7 @@ func (m *Grid) WriteTo(dst io.Writer) (n int64, err error) {
 }
 
 // ReadFrom reads the grid from the reader.
-func ReadFrom(src io.Reader) (grid *Grid, err error) {
+func ReadFrom[T comparable](src io.Reader) (grid *Grid[T], err error) {
 	r := iostream.NewReader(src)
 	header := make([]byte, 8)
 	if _, err := io.ReadFull(r, header); err != nil {
@@ -57,14 +59,14 @@ func ReadFrom(src io.Reader) (grid *Grid, err error) {
 	view.Max.Y = int16(binary.BigEndian.Uint16(header[6:8]))
 
 	// Allocate a new grid
-	grid = NewGrid(view.Max.X+1, view.Max.Y+1)
+	grid = NewGridOf[T](view.Max.X+1, view.Max.Y+1)
 	buf := make([]byte, tileDataSize)
-	grid.pagesWithin(view.Min, view.Max, func(page *page) {
-		if _, err := io.ReadFull(r, buf); err != nil {
+	grid.pagesWithin(view.Min, view.Max, func(page *page[T]) {
+		if _, err = io.ReadFull(r, buf); err != nil {
 			return
 		}
 
-		copy(page.Data(), buf)
+		copy((*[tileDataSize]byte)(unsafe.Pointer(&page.tiles))[:], buf)
 	})
 	return
 }
@@ -72,7 +74,7 @@ func ReadFrom(src io.Reader) (grid *Grid, err error) {
 // ---------------------------------- File ----------------------------------
 
 // WriteFile writes the grid into a flate-compressed binary file.
-func (m *Grid) WriteFile(filename string) error {
+func (m *Grid[T]) WriteFile(filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -92,7 +94,7 @@ func (m *Grid) WriteFile(filename string) error {
 
 // Restore restores the grid from the specified file. The grid must
 // be written using the corresponding WriteFile() method.
-func ReadFile(filename string) (grid *Grid, err error) {
+func ReadFile[T comparable](filename string) (grid *Grid[T], err error) {
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return nil, os.ErrNotExist
 	}
@@ -104,5 +106,5 @@ func ReadFile(filename string) (grid *Grid, err error) {
 	}
 
 	defer file.Close()
-	return ReadFrom(flate.NewReader(file))
+	return ReadFrom[T](flate.NewReader(file))
 }

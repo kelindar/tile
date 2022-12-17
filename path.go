@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type costFn = func(Tile) uint16
+type costFn = func(Value) uint16
 
 // Edge represents an edge of the path
 type edge struct {
@@ -17,7 +17,7 @@ type edge struct {
 }
 
 // Around performs a breadth first search around a point.
-func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
+func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Point, Tile[T])) {
 	start, ok := m.At(from.X, from.Y)
 	if !ok {
 		return
@@ -41,12 +41,12 @@ func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 		current := unpackPoint(pCurr)
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile) {
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile[T]) {
 			if d := from.DistanceTo(next); d > distance {
 				return // Too far
 			}
 
-			if cost := costOf(nextTile); cost == 0 {
+			if cost := costOf(nextTile.Value()); cost == 0 {
 				return // Blocked tile, ignore completely
 			}
 
@@ -62,7 +62,7 @@ func (m *Grid) Around(from Point, distance uint32, costOf costFn, fn Iterator) {
 }
 
 // Path calculates a short path and the distance between the two locations
-func (m *Grid) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
+func (m *Grid[T]) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 
 	// Acquire a frontier heap for search
 	frontier := acquireHeap()
@@ -97,8 +97,8 @@ func (m *Grid) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
 		}
 
 		// Get all of the neighbors
-		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile) {
-			cNext := costOf(nextTile)
+		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile[T]) {
+			cNext := costOf(nextTile.Value())
 			if cNext == 0 {
 				return // Blocked tile, ignore completely
 			}
@@ -185,7 +185,7 @@ func (h *heap32) Pop() (uint32, bool) {
 
 // Remove removes and returns the element at index i from the heap.
 // The complexity is O(log n) where n = h.Len().
-func (h *heap32) Remove(i int) uint32 {
+/*func (h *heap32) Remove(i int) uint32 {
 	n := h.Len() - 1
 	if n != i {
 		h.Swap(i, n)
@@ -194,7 +194,7 @@ func (h *heap32) Remove(i int) uint32 {
 		}
 	}
 	return h.pop()
-}
+}*/
 
 func (h *heap32) pop() uint32 {
 	old := *h

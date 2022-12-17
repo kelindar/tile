@@ -131,7 +131,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Tile) {})
+			m.Around(At(115, 20), 3, costOf, func(_ Point, _ Tile[string]) {})
 		}
 	})
 
@@ -139,7 +139,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Tile) {})
+			m.Around(At(115, 20), 5, costOf, func(_ Point, _ Tile[string]) {})
 		}
 	})
 
@@ -147,7 +147,7 @@ func BenchmarkAround(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Tile) {})
+			m.Around(At(115, 20), 10, costOf, func(_ Point, _ Tile[string]) {})
 		}
 	})
 }
@@ -157,7 +157,7 @@ func TestAround(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		var path []string
-		m.Around(At(2, 2), 3, costOf, func(p Point, tile Tile) {
+		m.Around(At(2, 2), 3, costOf, func(p Point, tile Tile[string]) {
 			path = append(path, p.String())
 		})
 		assert.Equal(t, 10, len(path))
@@ -166,6 +166,13 @@ func TestAround(t *testing.T) {
 			"1,1", "1,3", "3,3", "4,3", "3,4",
 		}, path)
 	}
+}
+
+func TestAroundMiss(t *testing.T) {
+	m := mapFrom("9x9.png")
+	m.Around(At(20, 20), 3, costOf, func(p Point, tile Tile[string]) {
+		t.Fail()
+	})
 }
 
 // BenchmarkHeap-8   	   94454	     12303 ns/op	    3968 B/op	       5 allocs/op
@@ -215,15 +222,15 @@ func rand(i int) uint32 {
 // -----------------------------------------------------------------------------
 
 // Cost estimation function
-func costOf(tile Tile) uint16 {
-	if (tile[0])&1 != 0 {
+func costOf(tile Value) uint16 {
+	if (tile)&1 != 0 {
 		return 0 // Blocked
 	}
 	return 1
 }
 
 // mapFrom creates a map from ASCII string
-func mapFrom(name string) *Grid {
+func mapFrom(name string) *Grid[string] {
 	f, err := os.Open("fixtures/" + name)
 	defer f.Close()
 	if err != nil {
@@ -244,7 +251,7 @@ func mapFrom(name string) *Grid {
 			switch v.R {
 			case 255:
 			case 0:
-				m.WriteAt(x, y, Tile{0xff, 0, 0, 0, 0, 0})
+				m.WriteAt(x, y, Value(0xff))
 			}
 
 		}
@@ -253,18 +260,18 @@ func mapFrom(name string) *Grid {
 }
 
 // plotPath plots the path on ASCII map
-func plotPath(m *Grid, path []Point) string {
+func plotPath(m *Grid[string], path []Point) string {
 	out := make([][]byte, m.Size.Y)
 	for i := range out {
 		out[i] = make([]byte, m.Size.X)
 	}
 
-	m.Each(func(l Point, tile Tile) {
+	m.Each(func(l Point, tile Tile[string]) {
 		//println(l.String(), int(tile[0]))
 		switch {
 		case pointInPath(l, path):
 			out[l.Y][l.X] = 'x'
-		case tile[0]&1 != 0:
+		case tile.Value()&1 != 0:
 			out[l.Y][l.X] = '.'
 		default:
 			out[l.Y][l.X] = ' '
@@ -290,16 +297,16 @@ func pointInPath(point Point, path []Point) bool {
 }
 
 // draw converts the map to a black and white image for debugging purposes.
-func drawGrid(m *Grid, rect Rect) image.Image {
+func drawGrid(m *Grid[string], rect Rect) image.Image {
 	if rect.Max.X == 0 || rect.Max.Y == 0 {
 		rect = NewRect(0, 0, m.Size.X, m.Size.Y)
 	}
 
 	size := rect.Size()
 	output := image.NewRGBA(image.Rect(0, 0, int(size.X), int(size.Y)))
-	m.Within(rect.Min, rect.Max, func(p Point, tile Tile) {
+	m.Within(rect.Min, rect.Max, func(p Point, tile Tile[string]) {
 		a := uint8(255)
-		if tile[0] == 1 {
+		if tile.Value() == 1 {
 			a = 0
 		}
 

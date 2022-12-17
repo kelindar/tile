@@ -8,27 +8,30 @@ import (
 )
 
 // Update represents a tile update notification.
-type Update struct {
-	Point // The tile location
-	Tile  // The tile data
+type Update[T comparable] struct {
+	Point       // The tile location
+	Old   Value // Old tile value
+	New   Value // New tile value
+	Add   T     // An object was added to the tile
+	Del   T     // An object was removed from the tile
 }
 
 // View represents a view which can monitor a collection of tiles.
-type View struct {
-	Grid  *Grid       // The associated map
-	Inbox chan Update // The update inbox for the view
-	rect  Rect        // The view box
+type View[T comparable] struct {
+	Grid  *Grid[T]       // The associated map
+	Inbox chan Update[T] // The update inbox for the view
+	rect  Rect           // The view box
 }
 
 // Resize resizes the viewport.
-func (v *View) Resize(box Rect, fn Iterator) {
+func (v *View[T]) Resize(box Rect, fn func(Point, Tile[T])) {
 	owner := v.Grid // The parent map
 	prev := v.rect  // Previous bounding box
 	v.rect = box    // New bounding box
 
 	// Unsubscribe from the pages which are not required anymore
 	if prev.Min.X >= 0 || prev.Min.Y >= 0 || prev.Max.X >= 0 || prev.Max.Y >= 0 {
-		owner.pagesWithin(prev.Min, prev.Max, func(page *page) {
+		owner.pagesWithin(prev.Min, prev.Max, func(page *page[T]) {
 			if bounds := page.Bounds(); !bounds.Intersects(box) {
 				if owner.observers.Unsubscribe(page.point, v) {
 					page.SetObserved(false) // Mark the page as not being observed
@@ -38,7 +41,7 @@ func (v *View) Resize(box Rect, fn Iterator) {
 	}
 
 	// Subscribe to every page which we have not previously subscribed
-	owner.pagesWithin(box.Min, box.Max, func(page *page) {
+	owner.pagesWithin(box.Min, box.Max, func(page *page[T]) {
 		if bounds := page.Bounds(); !bounds.Intersects(prev) {
 			if owner.observers.Subscribe(page.point, v) {
 				page.SetObserved(true) // Mark the page as being observed
@@ -47,9 +50,9 @@ func (v *View) Resize(box Rect, fn Iterator) {
 
 		// Callback for each new tile in the view
 		if fn != nil {
-			page.Each(func(p Point, tile Tile) {
+			page.Each(v.Grid, func(p Point, v Tile[T]) {
 				if !prev.Contains(p) && box.Contains(p) {
-					fn(p, tile)
+					fn(p, v)
 				}
 			})
 		}
@@ -57,7 +60,7 @@ func (v *View) Resize(box Rect, fn Iterator) {
 }
 
 // MoveBy moves the viewport towards a particular direction.
-func (v *View) MoveBy(x, y int16, fn Iterator) {
+func (v *View[T]) MoveBy(x, y int16, fn func(Point, Tile[T])) {
 	v.Resize(Rect{
 		Min: v.rect.Min.Add(At(x, y)),
 		Max: v.rect.Max.Add(At(x, y)),
@@ -65,7 +68,7 @@ func (v *View) MoveBy(x, y int16, fn Iterator) {
 }
 
 // MoveAt moves the viewport to a specific coordinate.
-func (v *View) MoveAt(nw Point, fn Iterator) {
+func (v *View[T]) MoveAt(nw Point, fn func(Point, Tile[T])) {
 	size := v.rect.Max.Subtract(v.rect.Min)
 	v.Resize(Rect{
 		Min: nw,
@@ -74,29 +77,29 @@ func (v *View) MoveAt(nw Point, fn Iterator) {
 }
 
 // Each iterates over all of the tiles in the view.
-func (v *View) Each(fn Iterator) {
+func (v *View[T]) Each(fn func(Point, Tile[T])) {
 	v.Grid.Within(v.rect.Min, v.rect.Max, fn)
 }
 
 // At returns the tile at a specified position.
-func (v *View) At(x, y int16) (Tile, bool) {
+func (v *View[T]) At(x, y int16) (Tile[T], bool) {
 	return v.Grid.At(x, y)
 }
 
 // WriteAt updates the entire tile at a specific coordinate.
-func (v *View) WriteAt(x, y int16, tile Tile) {
+func (v *View[T]) WriteAt(x, y int16, tile Value) {
 	v.Grid.WriteAt(x, y, tile)
 }
 
 // MergeAt updates the bits of tile at a specific coordinate. The bits are specified
 // by the mask. The bits that need to be updated should be flipped on in the mask.
-func (v *View) MergeAt(x, y int16, tile, mask Tile) {
-	v.Grid.MergeAt(x, y, tile, mask)
+func (v *View[T]) MergeAt(x, y int16, tile, mask Value) {
+	v.Grid.MaskAt(x, y, tile, mask)
 }
 
 // Close closes the view and unsubscribes from everything.
-func (v *View) Close() error {
-	v.Grid.pagesWithin(v.rect.Min, v.rect.Max, func(page *page) {
+func (v *View[T]) Close() error {
+	v.Grid.pagesWithin(v.rect.Min, v.rect.Max, func(page *page[T]) {
 		if v.Grid.observers.Unsubscribe(page.point, v) {
 			page.SetObserved(false) // Mark the page as not being observed
 		}
@@ -105,7 +108,7 @@ func (v *View) Close() error {
 }
 
 // onUpdate occurs when a tile has updated.
-func (v *View) onUpdate(ev *Update) {
+func (v *View[T]) onUpdate(ev *Update[T]) {
 	if v.rect.Contains(ev.Point) {
 		v.Inbox <- *ev // (copy)
 	}
@@ -114,40 +117,37 @@ func (v *View) onUpdate(ev *Update) {
 // -----------------------------------------------------------------------------
 
 // observer represents a tile update observer.
-type observer interface {
-	onUpdate(*Update)
+type observer[T comparable] interface {
+	onUpdate(*Update[T])
 }
 
 // Pubsub represents a publish/subscribe layer for observers.
-type pubsub struct {
+type pubsub[T comparable] struct {
 	m sync.Map
 }
 
 // Notify notifies listeners of an update that happened.
-func (p *pubsub) Notify(page, point Point, tile Tile) {
+func (p *pubsub[T]) Notify(page Point, ev *Update[T]) {
 	if v, ok := p.m.Load(page.Integer()); ok {
-		v.(*observers).Notify(&Update{
-			Point: point,
-			Tile:  tile,
-		})
+		v.(*observers[T]).Notify(ev)
 	}
 }
 
 // Subscribe registers an event listener on a system
-func (p *pubsub) Subscribe(at Point, sub observer) bool {
+func (p *pubsub[T]) Subscribe(at Point, sub observer[T]) bool {
 	if v, ok := p.m.Load(at.Integer()); ok {
-		return v.(*observers).Subscribe(sub)
+		return v.(*observers[T]).Subscribe(sub)
 	}
 
 	// Slow path
-	v, _ := p.m.LoadOrStore(at.Integer(), newObservers())
-	return v.(*observers).Subscribe(sub)
+	v, _ := p.m.LoadOrStore(at.Integer(), newObservers[T]())
+	return v.(*observers[T]).Subscribe(sub)
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (p *pubsub) Unsubscribe(at Point, sub observer) bool {
+func (p *pubsub[T]) Unsubscribe(at Point, sub observer[T]) bool {
 	if v, ok := p.m.Load(at.Integer()); ok {
-		return v.(*observers).Unsubscribe(sub)
+		return v.(*observers[T]).Unsubscribe(sub)
 	}
 	return false
 }
@@ -156,20 +156,20 @@ func (p *pubsub) Unsubscribe(at Point, sub observer) bool {
 
 // Observers represents a change notifier which notifies the subscribers when
 // a specific tile is updated.
-type observers struct {
+type observers[T comparable] struct {
 	sync.Mutex
-	subs []observer
+	subs []observer[T]
 }
 
 // newObservers creates a new instance of an change observer.
-func newObservers() *observers {
-	return &observers{
-		subs: make([]observer, 0, 8),
+func newObservers[T comparable]() *observers[T] {
+	return &observers[T]{
+		subs: make([]observer[T], 0, 8),
 	}
 }
 
 // Notify notifies listeners of an update that happened.
-func (s *observers) Notify(ev *Update) {
+func (s *observers[T]) Notify(ev *Update[T]) {
 	if s == nil {
 		return
 	}
@@ -185,7 +185,7 @@ func (s *observers) Notify(ev *Update) {
 }
 
 // Subscribe registers an event listener on a system
-func (s *observers) Subscribe(sub observer) bool {
+func (s *observers[T]) Subscribe(sub observer[T]) bool {
 	s.Lock()
 	defer s.Unlock()
 	s.subs = append(s.subs, sub)
@@ -193,7 +193,7 @@ func (s *observers) Subscribe(sub observer) bool {
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (s *observers) Unsubscribe(sub observer) bool {
+func (s *observers[T]) Unsubscribe(sub observer[T]) bool {
 	s.Lock()
 	defer s.Unlock()
 

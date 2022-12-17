@@ -14,8 +14,8 @@ import (
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkStore/save-8         	    9068	    129974 ns/op	       8 B/op	       1 allocs/op
-BenchmarkStore/read-8         	    2967	    379663 ns/op	  647465 B/op	       8 allocs/op
+BenchmarkStore/save-8         	   14455	     81883 ns/op	       8 B/op	       1 allocs/op
+BenchmarkStore/read-8         	    2787	    399699 ns/op	  647421 B/op	       7 allocs/op
 */
 func BenchmarkStore(b *testing.B) {
 	m := mapFrom("300x300.png")
@@ -38,7 +38,7 @@ func BenchmarkStore(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			ReadFrom(bytes.NewBuffer(enc.Bytes()))
+			ReadFrom[string](bytes.NewBuffer(enc.Bytes()))
 		}
 	})
 
@@ -51,10 +51,10 @@ func TestSaveLoad(t *testing.T) {
 	enc := new(bytes.Buffer)
 	n, err := m.WriteTo(enc)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(540008), n)
+	assert.Equal(t, int64(360008), n)
 
 	// Load the map back
-	out, err := ReadFrom(enc)
+	out, err := ReadFrom[string](enc)
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }
@@ -70,12 +70,12 @@ func TestSaveLoadFlate(t *testing.T) {
 	n, err := m.WriteTo(writer)
 	assert.NoError(t, writer.Close())
 	assert.NoError(t, err)
-	assert.Equal(t, int64(540008), n)
-	assert.Equal(t, int(18299), output.Len())
+	assert.Equal(t, int64(360008), n)
+	assert.Equal(t, int(16533), output.Len())
 
 	// Load the map back
 	reader := flate.NewReader(output)
-	out, err := ReadFrom(reader)
+	out, err := ReadFrom[string](reader)
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }
@@ -85,13 +85,15 @@ func TestSaveLoadFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(temp.Name())
 
-	println(temp.Name())
 	// Write a test map into temp file
 	m := mapFrom("300x300.png")
 	assert.NoError(t, m.WriteFile(temp.Name()))
 
+	fi, _ := temp.Stat()
+	assert.Equal(t, int64(16533), fi.Size())
+
 	// Read the map back
-	out, err := ReadFile(temp.Name())
+	out, err := ReadFile[string](temp.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, m.pages, out.pages)
 }

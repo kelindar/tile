@@ -12,9 +12,9 @@ import (
 
 /*
 cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkView/write-8         	 5910660	       191.7 ns/op	      16 B/op	       1 allocs/op
-BenchmarkView/move-8          	    8253	    138149 ns/op	       0 B/op	       0 allocs/op
-BenchmarkView/notify-8        	 6024670	       197.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkView/write-8         	 7208314	       174.0 ns/op	       8 B/op	       1 allocs/op
+BenchmarkView/move-8          	    9231	    120567 ns/op	       0 B/op	       0 allocs/op
+BenchmarkView/notify-8        	 7274684	       170.2 ns/op	       8 B/op	       1 allocs/op
 */
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
@@ -28,7 +28,7 @@ func BenchmarkView(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
-			v.WriteAt(152, 52, Tile{})
+			v.WriteAt(152, 52, Value(0))
 		}
 	})
 
@@ -42,14 +42,6 @@ func BenchmarkView(b *testing.B) {
 		b.ResetTimer()
 		for n := 0; n < b.N; n++ {
 			v.MoveAt(locs[n%2], nil)
-		}
-	})
-
-	b.Run("notify", func(b *testing.B) {
-		b.ReportAllocs()
-		b.ResetTimer()
-		for n := 0; n < b.N; n++ {
-			m.NotifyAt(150, 50)
 		}
 	})
 }
@@ -84,51 +76,45 @@ func TestView(t *testing.T) {
 	assert.Equal(t, 100, int(c))
 
 	// Update a tile in view
-	tile, _ := v.At(5, 5)
-	tile[0] = 55
-	v.WriteAt(5, 5, tile)
+	cursor, _ := v.At(5, 5)
+	before := cursor.Value()
+	v.WriteAt(5, 5, Value(55))
 	update := <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
-	assert.Equal(t, tile, update.Tile)
+	assert.NotEqual(t, before, update.New)
 
 	// Merge a tile in view, but with zero mask (won't do anything)
-	tile, _ = v.At(5, 5)
-	tile[0] = 66
-	v.MergeAt(5, 5, tile, Tile{}) // zero mask
+	cursor, _ = v.At(5, 5)
+	before = cursor.Value()
+	v.MergeAt(5, 5, Value(66), Value(0)) // zero mask
 	update = <-v.Inbox
 	assert.Equal(t, At(5, 5), update.Point)
-	assert.NotEqual(t, tile, update.Tile)
+	assert.Equal(t, before, update.New)
 
 	// Close the view
 	assert.NoError(t, v.Close())
-	v.WriteAt(5, 5, tile)
+	v.WriteAt(5, 5, Value(66))
 	assert.Equal(t, 0, len(v.Inbox))
 }
 
-type counter int
-
-func (c *counter) count(p Point, tile Tile) {
-	*c++
-}
-
 func TestObservers(t *testing.T) {
-	ev := newObservers()
+	ev := newObservers[uint32]()
 	assert.NotNil(t, ev)
 
 	// Subscriber which does nothing
-	var sub1 fakeView = func(e *Update) {}
+	var sub1 fakeView[uint32] = func(e *Update[uint32]) {}
 	ev.Subscribe(&sub1)
 
 	// Counting subscriber
 	var count int
-	var sub2 fakeView = func(e *Update) {
+	var sub2 fakeView[uint32] = func(e *Update[uint32]) {
 		count += int(e.X)
 	}
 	ev.Subscribe(&sub2)
 
-	ev.Notify(&Update{Point: At(1, 0)})
-	ev.Notify(&Update{Point: At(2, 0)})
-	ev.Notify(&Update{Point: At(3, 0)})
+	ev.Notify(&Update[uint32]{Point: At(1, 0)})
+	ev.Notify(&Update[uint32]{Point: At(2, 0)})
+	ev.Notify(&Update[uint32]{Point: At(3, 0)})
 
 	for count < 6 {
 		time.Sleep(1 * time.Millisecond)
@@ -137,34 +123,81 @@ func TestObservers(t *testing.T) {
 	assert.Equal(t, 6, count)
 	ev.Unsubscribe(&sub2)
 
-	ev.Notify(&Update{Point: At(2, 0)})
+	ev.Notify(&Update[uint32]{Point: At(2, 0)})
 	assert.Equal(t, 6, count)
 }
 
 func TestObserversNil(t *testing.T) {
 	assert.NotPanics(t, func() {
-		var ev *observers
-		ev.Notify(&Update{Point: At(1, 0)})
+		var ev *observers[uint32]
+		ev.Notify(&Update[uint32]{Point: At(1, 0)})
 	})
 }
 
-func TestNotifyAt(t *testing.T) {
+func TestStateUpdates(t *testing.T) {
 	m := mapFrom("300x300.png")
 
 	// Create a new view
 	c := counter(0)
-	v := m.View(NewRect(0, 0, 99, 99), c.count)
+	v := m.View(NewRect(0, 0, 9, 9), c.count)
 	assert.NotNil(t, v)
-	assert.Equal(t, 10000, int(c))
+	assert.Equal(t, 100, int(c))
 
-	m.NotifyAt(1, 1)
-	update := <-v.Inbox
-	assert.Equal(t, int16(1), update.X)
-	assert.Equal(t, int16(1), update.Y)
+	// Update a tile in view
+	cursor, _ := v.At(5, 5)
+	cursor.Write(Value(0xF0))
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		New:   Value(0xF0),
+	}, <-v.Inbox)
+
+	// Add an object to an observed tile
+	cursor.Add("A")
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Value(0xF0),
+		New:   Value(0xF0),
+		Add:   "A",
+	}, <-v.Inbox)
+
+	// Delete an object from an observed tile
+	cursor.Del("A")
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Value(0xF0),
+		New:   Value(0xF0),
+		Del:   "A",
+	}, <-v.Inbox)
+
+	// Mask a tile in view
+	cursor.Mask(0xFF, 0x0F)
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Value(0xF0),
+		New:   Value(0xFF),
+	}, <-v.Inbox)
+
+	// Merge a tile in view
+	cursor.Merge(func(v Value) Value {
+		return 0xAA
+	})
+	assert.Equal(t, Update[string]{
+		Point: At(5, 5),
+		Old:   Value(0xFF),
+		New:   Value(0xAA),
+	}, <-v.Inbox)
 }
 
-type fakeView func(*Update)
+// ---------------------------------- Mocks ----------------------------------
 
-func (f fakeView) onUpdate(e *Update) {
+type fakeView[T comparable] func(*Update[T])
+
+func (f fakeView[T]) onUpdate(e *Update[T]) {
 	f(e)
+}
+
+type counter int
+
+func (c *counter) count(p Point, tile Tile[string]) {
+	*c++
 }
