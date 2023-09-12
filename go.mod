@@ -1,4 +1,4 @@
-module github.com/kelindar/tile
+module github.com/xkonti/tile
 
 go 1.19
 
