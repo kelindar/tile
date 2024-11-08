@@ -10,10 +10,9 @@ import (
 )
 
 /*
-cpu: Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz
-BenchmarkPoint/within-8         	1000000000	         0.2697 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPoint/within-rect-8    	1000000000	         0.2928 ns/op	       0 B/op	       0 allocs/op
-BenchmarkPoint/interleave-8     	1000000000	         0.8242 ns/op	       0 B/op	       0 allocs/op
+cpu: 13th Gen Intel(R) Core(TM) i7-13700K
+BenchmarkPoint/within-24         	1000000000	         0.09854 ns/op	       0 B/op	       0 allocs/op
+BenchmarkPoint/within-rect-24    	1000000000	         0.09966 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkPoint(b *testing.B) {
 	p := At(10, 20)
@@ -50,10 +49,16 @@ func TestPoint(t *testing.T) {
 	assert.Equal(t, "8,18", p.Subtract(p2).String())
 	assert.Equal(t, "20,40", p.Multiply(p2).String())
 	assert.Equal(t, "5,10", p.Divide(p2).String())
-	assert.True(t, p.Within(At(1, 1), At(10, 20)))
-	assert.True(t, p.WithinRect(NewRect(1, 1, 10, 20)))
+	assert.True(t, p.Within(At(1, 1), At(20, 30)))
+	assert.True(t, p.WithinRect(NewRect(1, 1, 20, 30)))
 	assert.False(t, p.WithinSize(At(10, 20)))
 	assert.True(t, p.WithinSize(At(20, 30)))
+}
+
+func TestIntersects(t *testing.T) {
+	assert.True(t, NewRect(0, 0, 2, 2).Intersects(NewRect(1, 0, 3, 2)))
+	assert.False(t, NewRect(0, 0, 2, 2).Intersects(NewRect(2, 0, 4, 2)))
+	assert.False(t, NewRect(10, 10, 12, 12).Intersects(NewRect(9, 12, 11, 14)))
 }
 
 func TestDirection(t *testing.T) {
@@ -87,4 +92,58 @@ func TestMove(t *testing.T) {
 	for _, tc := range tests {
 		assert.Equal(t, tc.out, Point{}.Move(tc.dir), tc.dir.String())
 	}
+}
+
+func TestContains(t *testing.T) {
+	tests := map[Point]bool{
+		{X: 0, Y: 0}: true,
+		{X: 1, Y: 0}: true,
+		{X: 0, Y: 1}: true,
+		{X: 1, Y: 1}: true,
+		{X: 2, Y: 2}: false,
+		{X: 3, Y: 3}: false,
+		{X: 1, Y: 2}: false,
+		{X: 2, Y: 1}: false,
+	}
+
+	for point, expect := range tests {
+		r := NewRect(0, 0, 2, 2)
+		assert.Equal(t, expect, r.Contains(point), point.String())
+	}
+}
+
+func TestDiff_Right(t *testing.T) {
+	a := Rect{At(0, 0), At(2, 2)}
+	b := Rect{At(1, 0), At(3, 2)}
+
+	diff := a.Difference(b)
+	assert.Equal(t, Rect{At(0, 0), At(1, 2)}, diff[2])
+	assert.Equal(t, Rect{At(2, 0), At(3, 2)}, diff[3])
+}
+
+func TestDiff_Left(t *testing.T) {
+	a := Rect{At(0, 0), At(2, 2)}
+	b := Rect{At(-1, 0), At(1, 2)}
+
+	diff := a.Difference(b)
+	assert.Equal(t, Rect{At(-1, 0), At(0, 2)}, diff[2])
+	assert.Equal(t, Rect{At(1, 0), At(2, 2)}, diff[3])
+}
+
+func TestDiff_Up(t *testing.T) {
+	a := Rect{At(0, 0), At(2, 2)}
+	b := Rect{At(0, -1), At(2, 1)}
+
+	diff := a.Difference(b)
+	assert.Equal(t, Rect{At(0, -1), At(2, 0)}, diff[0])
+	assert.Equal(t, Rect{At(0, 1), At(2, 2)}, diff[1])
+}
+
+func TestDiff_Down(t *testing.T) {
+	a := Rect{At(0, 0), At(2, 2)}
+	b := Rect{At(0, 1), At(2, 3)}
+
+	diff := a.Difference(b)
+	assert.Equal(t, Rect{At(0, 0), At(2, 1)}, diff[0])
+	assert.Equal(t, Rect{At(0, 2), At(2, 3)}, diff[1])
 }

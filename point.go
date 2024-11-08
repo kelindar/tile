@@ -73,12 +73,12 @@ func (p Point) DivideScalar(s int16) Point {
 
 // Within checks if the point is within the specified bounding box.
 func (p Point) Within(nw, se Point) bool {
-	return p.X >= nw.X && p.Y >= nw.Y && p.X <= se.X && p.Y <= se.Y
+	return Rect{Min: nw, Max: se}.Contains(p)
 }
 
 // WithinRect checks if the point is within the specified bounding box.
 func (p Point) WithinRect(box Rect) bool {
-	return p.X >= box.Min.X && p.Y >= box.Min.Y && p.X <= box.Max.X && p.Y <= box.Max.Y
+	return box.Contains(p)
 }
 
 // WithinSize checks if the point is within the specified bounding box
@@ -143,21 +143,72 @@ func NewRect(left, top, right, bottom int16) Rect {
 }
 
 // Contains returns whether a point is within the rectangle or not.
-func (r *Rect) Contains(p Point) bool {
-	return p.X >= r.Min.X && p.Y >= r.Min.Y && p.X <= r.Max.X && p.Y <= r.Max.Y
+func (a Rect) Contains(p Point) bool {
+	return a.Min.X <= p.X && p.X < a.Max.X && a.Min.Y <= p.Y && p.Y < a.Max.Y
 }
 
 // Intersects returns whether a rectangle intersects with another rectangle or not.
-func (r *Rect) Intersects(box Rect) bool {
-	return !(box.Max.X < r.Min.X || box.Min.X > r.Max.X || box.Max.Y < r.Min.Y || box.Min.Y > r.Max.Y)
+func (a Rect) Intersects(b Rect) bool {
+	return b.Min.X < a.Max.X && a.Min.X < b.Max.X && b.Min.Y < a.Max.Y && a.Min.Y < b.Max.Y
 }
 
 // Size returns the size of the rectangle
-func (r *Rect) Size() Point {
+func (a *Rect) Size() Point {
 	return Point{
-		X: r.Max.X - r.Min.X,
-		Y: r.Max.Y - r.Min.Y,
+		X: a.Max.X - a.Min.X,
+		Y: a.Max.Y - a.Min.Y,
 	}
+}
+
+// IsZero returns true if the rectangle is zero-value
+func (a Rect) IsZero() bool {
+	return a.Min.X == a.Max.X && a.Min.Y == a.Max.Y
+}
+
+// Difference calculates up to four non-overlapping regions in a that are not covered by b.
+// If there are fewer than four distinct regions, the remaining Rects will be zero-value.
+func (a Rect) Difference(b Rect) (result [4]Rect) {
+	if b.Contains(a.Min) && b.Contains(a.Max) {
+		return // Fully covered, return zero-value result
+	}
+
+	// Check for non-overlapping cases
+	if !a.Intersects(b) {
+		result[0] = a // No overlap, return A as is
+		return
+	}
+
+	left := min(a.Min.X, b.Min.X)
+	right := max(a.Max.X, b.Max.X)
+	top := min(a.Min.Y, b.Min.Y)
+	bottom := max(a.Max.Y, b.Max.Y)
+
+	result[0].Min = Point{X: left, Y: top}
+	result[0].Max = Point{X: right, Y: max(a.Min.Y, b.Min.Y)}
+
+	result[1].Min = Point{X: left, Y: min(a.Max.Y, b.Max.Y)}
+	result[1].Max = Point{X: right, Y: bottom}
+
+	result[2].Min = Point{X: left, Y: top}
+	result[2].Max = Point{X: max(a.Min.X, b.Min.X), Y: bottom}
+
+	result[3].Min = Point{X: min(a.Max.X, b.Max.X), Y: top}
+	result[3].Max = Point{X: right, Y: bottom}
+
+	if result[0].Size().X == 0 || result[0].Size().Y == 0 {
+		result[0] = Rect{}
+	}
+	if result[1].Size().X == 0 || result[1].Size().Y == 0 {
+		result[1] = Rect{}
+	}
+	if result[2].Size().X == 0 || result[2].Size().Y == 0 {
+		result[2] = Rect{}
+	}
+	if result[3].Size().X == 0 || result[3].Size().Y == 0 {
+		result[3] = Rect{}
+	}
+
+	return
 }
 
 // -----------------------------------------------------------------------------
@@ -199,4 +250,9 @@ func (v Direction) String() string {
 	default:
 		return ""
 	}
+}
+
+// Vector returns a direction vector with a given scale
+func (v Direction) Vector(scale int16) Point {
+	return Point{}.MoveBy(v, scale)
 }
