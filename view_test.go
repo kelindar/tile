@@ -11,14 +11,13 @@ import (
 )
 
 /*
-cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkView/write-8         	 7208314	       174.0 ns/op	       8 B/op	       1 allocs/op
-BenchmarkView/move-8          	    9231	    120567 ns/op	       0 B/op	       0 allocs/op
-BenchmarkView/notify-8        	 7274684	       170.2 ns/op	       8 B/op	       1 allocs/op
+cpu: 13th Gen Intel(R) Core(TM) i7-13700K
+BenchmarkView/write-24         	 9540012	       125.0 ns/op	      48 B/op	       1 allocs/op
+BenchmarkView/move-24          	   16141	     74408 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
-	v := m.View(NewRect(100, 0, 199, 99), nil)
+	v := m.View(NewRect(100, 0, 200, 100), nil)
 	go func() {
 		for range v.Inbox {
 		}
@@ -51,24 +50,24 @@ func TestView(t *testing.T) {
 
 	// Create a new view
 	c := counter(0)
-	v := m.View(NewRect(100, 0, 199, 99), c.count)
+	v := m.View(NewRect(100, 0, 200, 100), c.count)
 	assert.NotNil(t, v)
 	assert.Equal(t, 10000, int(c))
 
 	// Resize to 10x10
 	c = counter(0)
-	v.Resize(NewRect(0, 0, 9, 9), c.count)
+	v.Resize(NewRect(0, 0, 10, 10), c.count)
 	assert.Equal(t, 100, int(c))
 
 	// Move down-right
 	c = counter(0)
 	v.MoveBy(2, 2, c.count)
-	assert.Equal(t, 36, int(c))
+	assert.Equal(t, 48, int(c))
 
 	// Move at location
 	c = counter(0)
 	v.MoveAt(At(4, 4), c.count)
-	assert.Equal(t, 36, int(c))
+	assert.Equal(t, 48, int(c))
 
 	// Each
 	c = counter(0)
@@ -139,7 +138,7 @@ func TestStateUpdates(t *testing.T) {
 
 	// Create a new view
 	c := counter(0)
-	v := m.View(NewRect(0, 0, 9, 9), c.count)
+	v := m.View(NewRect(0, 0, 10, 10), c.count)
 	assert.NotNil(t, v)
 	assert.Equal(t, 100, int(c))
 
@@ -188,7 +187,46 @@ func TestStateUpdates(t *testing.T) {
 	}, <-v.Inbox)
 }
 
+func TestObservers_MoveIncremental(t *testing.T) {
+	m := mapFrom("300x300.png")
+
+	// Create a new view
+	c := counter(0)
+	v := m.View(NewRect(10, 10, 12, 12), c.count)
+	assert.NotNil(t, v)
+	assert.Equal(t, 4, int(c))
+	assert.Equal(t, 9, countObservers(m))
+
+	const distance = 10
+	for i := 0; i < distance; i++ {
+		v.MoveTo(East, 1, c.count)
+	}
+	for i := 0; i < distance; i++ {
+		v.MoveTo(South, 1, c.count)
+	}
+	for i := 0; i < distance; i++ {
+		v.MoveTo(West, 1, c.count)
+	}
+	for i := 0; i < distance; i++ {
+		v.MoveTo(North, 1, c.count)
+	}
+
+	// Count the number of observers, should be the same as before
+	assert.Equal(t, 9, countObservers(m))
+	assert.NoError(t, v.Close())
+}
+
 // ---------------------------------- Mocks ----------------------------------
+
+func countObservers(m *Grid[string]) int {
+	var observers int
+	m.Each(func(p Point, t Tile[string]) {
+		if t.data.IsObserved() {
+			observers++
+		}
+	})
+	return observers
+}
 
 type fakeView[T comparable] func(*Update[T])
 

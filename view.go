@@ -24,39 +24,52 @@ type View[T comparable] struct {
 }
 
 // Resize resizes the viewport.
-func (v *View[T]) Resize(box Rect, fn func(Point, Tile[T])) {
+func (v *View[T]) Resize(view Rect, fn func(Point, Tile[T])) {
 	owner := v.Grid // The parent map
 	prev := v.rect  // Previous bounding box
-	v.rect = box    // New bounding box
+	v.rect = view   // New bounding box
 
-	// Unsubscribe from the pages which are not required anymore
-	if prev.Min.X >= 0 || prev.Min.Y >= 0 || prev.Max.X >= 0 || prev.Max.Y >= 0 {
-		owner.pagesWithin(prev.Min, prev.Max, func(page *page[T]) {
-			if bounds := page.Bounds(); !bounds.Intersects(box) {
+	for _, diff := range view.Difference(prev) {
+		if diff.IsZero() {
+			continue // Skip zero-value rectangles
+		}
+
+		owner.pagesWithin(diff.Min, diff.Max, func(page *page[T]) {
+			r := page.Bounds()
+			switch {
+
+			// Page is now in view
+			case view.Intersects(r) && !prev.Intersects(r):
+				if owner.observers.Subscribe(page.point, v) {
+					page.SetObserved(true) // Mark the page as being observed
+				}
+
+			// Page is no longer in view
+			case !view.Intersects(r) && prev.Intersects(r):
 				if owner.observers.Unsubscribe(page.point, v) {
 					page.SetObserved(false) // Mark the page as not being observed
 				}
 			}
+
+			// Callback for each new tile in the view
+			if fn != nil {
+				page.Each(v.Grid, func(p Point, tile Tile[T]) {
+					if view.Contains(p) && !prev.Contains(p) {
+						fn(p, tile)
+					}
+				})
+			}
 		})
 	}
+}
 
-	// Subscribe to every page which we have not previously subscribed
-	owner.pagesWithin(box.Min, box.Max, func(page *page[T]) {
-		if bounds := page.Bounds(); !bounds.Intersects(prev) {
-			if owner.observers.Subscribe(page.point, v) {
-				page.SetObserved(true) // Mark the page as being observed
-			}
-		}
-
-		// Callback for each new tile in the view
-		if fn != nil {
-			page.Each(v.Grid, func(p Point, v Tile[T]) {
-				if !prev.Contains(p) && box.Contains(p) {
-					fn(p, v)
-				}
-			})
-		}
-	})
+// MoveTo moves the viewport towards a particular direction.
+func (v *View[T]) MoveTo(angle Direction, distance int16, fn func(Point, Tile[T])) {
+	p := angle.Vector(distance)
+	v.Resize(Rect{
+		Min: v.rect.Min.Add(p),
+		Max: v.rect.Max.Add(p),
+	}, fn)
 }
 
 // MoveBy moves the viewport towards a particular direction.

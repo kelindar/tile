@@ -1,10 +1,10 @@
 module github.com/kelindar/tile
 
-go 1.19
+go 1.23
 
 require (
-	github.com/kelindar/iostream v1.3.0
-	github.com/stretchr/testify v1.8.1
+	github.com/kelindar/iostream v1.4.0
+	github.com/stretchr/testify v1.9.0
 )
 
 require (

@@ -14,13 +14,14 @@ import (
 )
 
 /*
-cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkGrid/each-8         	     862	   1365740 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/neighbors-8    	66562384	        17.94 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/within-8       	   30012	     40112 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/at-8           	396362580	         3.025 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/write-8        	127712601	         9.256 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGrid/merge-8        	125377372	         9.410 ns/op	       0 B/op	       0 allocs/op
+cpu: 13th Gen Intel(R) Core(TM) i7-13700K
+BenchmarkGrid/each-24         	    1452	    	830268 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/neighbors-24    	121583491	         9.861 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/within-24       	   49360	     	 24477 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/at-24           	687659378	         1.741 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/write-24        	191272338	         6.307 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/merge-24        	162536985	         7.332 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGrid/mask-24         	158258084	         7.601 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkGrid(b *testing.B) {
 	var d Tile[uint32]
@@ -99,10 +100,10 @@ func BenchmarkGrid(b *testing.B) {
 }
 
 /*
-cpu: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
-BenchmarkState/range-8         	11211600	       103.4 ns/op	       0 B/op	       0 allocs/op
-BenchmarkState/add-8           	41380593	        29.00 ns/op	       0 B/op	       0 allocs/op
-BenchmarkState/del-8           	54474884	        21.79 ns/op	       0 B/op	       0 allocs/op
+cpu: 13th Gen Intel(R) Core(TM) i7-13700K
+BenchmarkState/range-24         	17017800	        71.14 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/add-24           	72639224	        16.32 ns/op	       0 B/op	       0 allocs/op
+BenchmarkState/del-24           	82469125	        13.65 ns/op	       0 B/op	       0 allocs/op
 */
 func BenchmarkState(b *testing.B) {
 	m := NewGridOf[int](768, 768)
@@ -155,13 +156,12 @@ func TestWithin(t *testing.T) {
 	m.Within(At(1, 1), At(5, 5), func(p Point, tile Tile[string]) {
 		path = append(path, p.String())
 	})
-	assert.Equal(t, 25, len(path))
+	assert.Equal(t, 16, len(path))
 	assert.ElementsMatch(t, []string{
-		"1,1", "2,1", "1,2", "2,2", "3,1",
-		"4,1", "5,1", "3,2", "4,2", "5,2",
-		"1,3", "2,3", "1,4", "2,4", "1,5",
-		"2,5", "3,3", "4,3", "5,3", "3,4",
-		"4,4", "5,4", "3,5", "4,5", "5,5",
+		"1,1", "2,1", "1,2", "2,2",
+		"3,1", "4,1", "3,2", "4,2",
+		"1,3", "2,3", "1,4", "2,4",
+		"3,3", "4,3", "3,4", "4,4",
 	}, path)
 }
 
@@ -179,6 +179,10 @@ func TestWithinCorner(t *testing.T) {
 	}, path)
 }
 
+func TestWithinXY(t *testing.T) {
+	assert.False(t, At(4, 8).WithinRect(NewRect(1, 6, 4, 10)))
+}
+
 func TestWithinOneSide(t *testing.T) {
 	m := NewGrid(9, 9)
 
@@ -186,11 +190,11 @@ func TestWithinOneSide(t *testing.T) {
 	m.Within(At(1, 6), At(4, 10), func(p Point, tile Tile[string]) {
 		path = append(path, p.String())
 	})
-	assert.Equal(t, 12, len(path))
+	assert.Equal(t, 9, len(path))
 	assert.ElementsMatch(t, []string{
-		"1,6", "2,6", "3,6", "4,6",
-		"1,7", "2,7", "3,7", "4,7",
-		"1,8", "2,8", "3,8", "4,8",
+		"1,6", "2,6", "3,6",
+		"1,7", "2,7", "3,7",
+		"1,8", "2,8", "3,8",
 	}, path)
 }
 
