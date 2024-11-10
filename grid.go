@@ -146,19 +146,6 @@ func (m *Grid[T]) Neighbors(x, y int16, fn func(Point, Tile[T])) {
 	}
 }
 
-// View creates a new view of the map.
-func (m *Grid[T]) View(rect Rect, fn func(Point, Tile[T])) *View[T] {
-	view := &View[T]{
-		Grid:  m,
-		Inbox: make(chan Update[T], 32),
-		rect:  NewRect(-1, -1, -1, -1),
-	}
-
-	// Call the resize method
-	view.Resize(rect, fn)
-	return view
-}
-
 // pageAt loads a page at a given page location
 func (m *Grid[T]) pageAt(x, y int16) *page[T] {
 	index := int(x) + int(m.pageWidth)*int(y)
@@ -378,6 +365,19 @@ func (c Tile[T]) Range(fn func(T) error) error {
 		}
 	}
 	return nil
+}
+
+// Observers iterates over all views observing this tile
+func (c Tile[T]) Observers(fn func(view Observer[T])) {
+	if !c.data.IsObserved() {
+		return
+	}
+
+	c.grid.observers.Each(c.data.point, func(sub Observer[T]) {
+		if view, ok := sub.(Observer[T]); ok {
+			fn(view)
+		}
+	})
 }
 
 // Add adds object to the set
