@@ -17,7 +17,9 @@ BenchmarkView/move-24          	   16141	     74408 ns/op	       0 B/op	       0
 */
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
-	v := m.View(NewRect(100, 0, 200, 100), nil)
+	v := NewView[string, string](m, "view 1")
+	v.Resize(NewRect(100, 0, 200, 100), nil)
+
 	go func() {
 		for range v.Inbox {
 		}
@@ -50,7 +52,8 @@ func TestView(t *testing.T) {
 
 	// Create a new view
 	c := counter(0)
-	v := m.View(NewRect(100, 0, 200, 100), c.count)
+	v := NewView[string, string](m, "view 1")
+	v.Resize(NewRect(100, 0, 200, 100), c.count)
 	assert.NotNil(t, v)
 	assert.Equal(t, 10000, int(c))
 
@@ -138,7 +141,9 @@ func TestStateUpdates(t *testing.T) {
 
 	// Create a new view
 	c := counter(0)
-	v := m.View(NewRect(0, 0, 10, 10), c.count)
+	v := NewView[string, string](m, "view 1")
+	v.Resize(NewRect(0, 0, 10, 10), c.count)
+
 	assert.NotNil(t, v)
 	assert.Equal(t, 100, int(c))
 
@@ -192,24 +197,38 @@ func TestObservers_MoveIncremental(t *testing.T) {
 
 	// Create a new view
 	c := counter(0)
-	v := m.View(NewRect(10, 10, 12, 12), c.count)
+	v := NewView[string, string](m, "view 1")
+	v.Resize(NewRect(10, 10, 12, 12), c.count)
+
 	assert.NotNil(t, v)
 	assert.Equal(t, 4, int(c))
 	assert.Equal(t, 9, countObservers(m))
 
 	const distance = 10
+
+	assert.Equal(t, 1, countObserversAt(m, 10, 10))
 	for i := 0; i < distance; i++ {
 		v.MoveTo(East, 1, c.count)
 	}
+
+	assert.Equal(t, 0, countObserversAt(m, 10, 10))
 	for i := 0; i < distance; i++ {
 		v.MoveTo(South, 1, c.count)
 	}
+
+	assert.Equal(t, 0, countObserversAt(m, 10, 10))
 	for i := 0; i < distance; i++ {
 		v.MoveTo(West, 1, c.count)
 	}
+
+	assert.Equal(t, 0, countObserversAt(m, 10, 10))
 	for i := 0; i < distance; i++ {
 		v.MoveTo(North, 1, c.count)
 	}
+
+	// Start should have the observer attached
+	assert.Equal(t, 1, countObserversAt(m, 10, 10))
+	assert.Equal(t, 0, countObserversAt(m, 100, 100))
 
 	// Count the number of observers, should be the same as before
 	assert.Equal(t, 9, countObservers(m))
@@ -217,6 +236,14 @@ func TestObservers_MoveIncremental(t *testing.T) {
 }
 
 // ---------------------------------- Mocks ----------------------------------
+
+func countObserversAt(m *Grid[string], x, y int16) (count int) {
+	start, _ := m.At(x, y)
+	start.Observers(func(view Observer[string]) {
+		count++
+	})
+	return count
+}
 
 func countObservers(m *Grid[string]) int {
 	var observers int
@@ -229,6 +256,14 @@ func countObservers(m *Grid[string]) int {
 }
 
 type fakeView[T comparable] func(*Update[T])
+
+func (f fakeView[T]) Viewport() Rect {
+	return Rect{}
+}
+
+func (f fakeView[T]) Resize(r Rect, fn func(Point, Tile[T])) {
+	// Do nothing
+}
 
 func (f fakeView[T]) onUpdate(e *Update[T]) {
 	f(e)

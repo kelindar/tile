@@ -129,15 +129,15 @@ m.Around(point, radius, func(v tile.Value) uint16{
 
 # Observers
 
-Given that the `Grid` is mutable and you can make changes to it from various goroutines, I have implemented a way to "observe" tile changes through a `View()` method which creates a `View` structure and can be used to observe changes within a bounding box. For example, you might want your player to have a view port and be notified if something changes on the map so you can do something about it.
+Given that the `Grid` is mutable and you can make changes to it from various goroutines, I have implemented a way to "observe" tile changes through a `NewView()` method which creates an `Observer` and can be used to observe changes within a bounding box. For example, you might want your player to have a view port and be notified if something changes on the map so you can do something about it.
 
-In order to use these observers, you need to first call the `View()` method and start polling from the `Inbox` channel which will contain the tile update notifications as they happen. This channel has a small buffer, but if not read it will block the update, so make sure you always poll everything from it.
+In order to use these observers, you need to first call the `NewView()` function and start polling from the `Inbox` channel which will contain the tile update notifications as they happen. This channel has a small buffer, but if not read it will block the update, so make sure you always poll everything from it. Note that `NewView[S, T]` takes two type parameters, the first one is the type of the state object and the second one is the type of the tile value. The state object is used to store additional information about the view itself, such as the name of the view or a pointer to a socket that is used to send updates to the client.
 
 In the example below we create a new 20x20 view on the grid and iterate through all of the tiles in the view.
 
 ```go
-rect := tile.NewRect(0, 0, 20, 20)
-view := grid.View(rect, func(p tile.Point, t tile.Tile){
+view := tile.NewView[string, string](grid, "My View #1")
+view.Resize(tile.NewRect(0, 0, 20, 20), func(p tile.Point, t tile.Tile){
     // Optional, all of the tiles that are in the view now
 })
 

@@ -211,6 +211,19 @@ func (a Rect) Difference(b Rect) (result [4]Rect) {
 	return
 }
 
+// Pack returns a packed representation of a rectangle
+func (a Rect) pack() uint64 {
+	return uint64(a.Min.Integer())<<32 | uint64(a.Max.Integer())
+}
+
+// Unpack returns a rectangle from a packed representation
+func unpackRect(v uint64) Rect {
+	return Rect{
+		Min: unpackPoint(uint32(v >> 32)),
+		Max: unpackPoint(uint32(v)),
+	}
+}
+
 // -----------------------------------------------------------------------------
 
 // Diretion represents a direction
