@@ -29,10 +29,10 @@ The main entry in this library is `Grid` which represents, as the name implies a
 
 Granted, uint32 value a bit small. The reason for this is the data layout, which is organised in thread-safe pages of 3x3 tiles, with the total size of 64 bytes which should neatly fit onto a cache line of a CPU.
 
-In order to create a new `Grid[T]`, you first need to call `NewGrid[T]()` method which pre-allocates the required space and initializes the tile grid itself. For example, you can create a 1000x1000 grid as shown below. The type argument `T` sets the type of the state objects. In the example below we want to create a new grid with a set of strings.
+In order to create a new `Grid[T]`, you first need to call `NewGridOf[T]()` method which pre-allocates the required space and initializes the tile grid itself. For example, you can create a 1000x1000 grid as shown below. The type argument `T` sets the type of the state objects. In the example below we want to create a new grid with a set of strings.
 
 ```go
-grid := tile.NewGrid[string](1000, 1000)
+grid := tile.NewGridOf[string](1000, 1000)
 ```
 
 The `Each()` method of the grid allows you to iterate through all of the tiles in the grid. It takes an iterator function which is then invoked on every tile.
