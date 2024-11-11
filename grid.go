@@ -34,8 +34,12 @@ func NewGridOf[T comparable](width, height int16) *Grid[T] {
 		pages:      pages,
 		pageWidth:  width,
 		pageHeight: height,
-		observers:  pubsub[T]{},
 		Size:       At(width*3, height*3),
+		observers: pubsub[T]{
+			tmp: sync.Pool{
+				New: func() any { return make(map[Observer[T]]struct{}, 4) },
+			},
+		},
 	}
 
 	// Function to calculate a point based on the index
@@ -242,48 +246,60 @@ func (p *page[T]) Unlock() {
 // ---------------------------------- Mutations ----------------------------------
 
 // writeTile stores the tile and return  whether tile is observed or not
-func (p *page[T]) writeTile(grid *Grid[T], idx uint8, tile Value) {
-	value := p.tileAt(idx)
-	for !atomic.CompareAndSwapUint32(&p.tiles[idx], uint32(value), uint32(tile)) {
-		value = p.tileAt(idx)
+func (p *page[T]) writeTile(grid *Grid[T], idx uint8, after Value) {
+	before := p.tileAt(idx)
+	for !atomic.CompareAndSwapUint32(&p.tiles[idx], uint32(before), uint32(after)) {
+		before = p.tileAt(idx)
 	}
 
 	// If observed, notify the observers of the tile
 	if p.IsObserved() {
-		grid.observers.Notify(p.point, &Update[T]{
-			Point: pointOf(p.point, idx),
-			Old:   value,
-			New:   tile,
-		})
+		at := pointOf(p.point, idx)
+		grid.observers.Notify1(&Update[T]{
+			Old: UpdateState[T]{
+				Point: at,
+				Value: before,
+			},
+			New: UpdateState[T]{
+				Point: at,
+				Value: after,
+			},
+		}, p.point, at)
 	}
 }
 
 // mergeTile atomically merges the tile bits given a function
 func (p *page[T]) mergeTile(grid *Grid[T], idx uint8, fn func(Value) Value) Value {
-	value := p.tileAt(idx)
-	merge := fn(value)
+	before := p.tileAt(idx)
+	after := fn(before)
 
 	// Swap, if we're not able to re-merge again
-	for !atomic.CompareAndSwapUint32(&p.tiles[idx], uint32(value), uint32(merge)) {
-		value = p.tileAt(idx)
-		merge = fn(value)
+	for !atomic.CompareAndSwapUint32(&p.tiles[idx], uint32(before), uint32(after)) {
+		before = p.tileAt(idx)
+		after = fn(before)
 	}
 
 	// If observed, notify the observers of the tile
 	if p.IsObserved() {
-		grid.observers.Notify(p.point, &Update[T]{
-			Point: pointOf(p.point, idx),
-			Old:   value,
-			New:   merge,
-		})
+		at := pointOf(p.point, idx)
+		grid.observers.Notify1(&Update[T]{
+			Old: UpdateState[T]{
+				Point: at,
+				Value: before,
+			},
+			New: UpdateState[T]{
+				Point: at,
+				Value: after,
+			},
+		}, p.point, at)
 	}
 
 	// Return the merged tile data
-	return merge
+	return after
 }
 
 // addObject adds object to the set
-func (p *page[T]) addObject(grid *Grid[T], idx uint8, object T) {
+func (p *page[T]) addObject(idx uint8, object T) (value uint32) {
 	p.Lock()
 
 	// Lazily initialize the map, as most pages might not have anything stored
@@ -293,38 +309,20 @@ func (p *page[T]) addObject(grid *Grid[T], idx uint8, object T) {
 	}
 
 	p.state[object] = uint8(idx)
+	value = p.tileAt(idx)
 	p.Unlock()
-
-	// If observed, notify the observers of the tile
-	if p.IsObserved() {
-		value := p.tileAt(idx)
-		grid.observers.Notify(p.point, &Update[T]{
-			Point: pointOf(p.point, idx),
-			Old:   value,
-			New:   value,
-			Add:   object,
-		})
-	}
+	return
 }
 
 // delObject removes the object from the set
-func (p *page[T]) delObject(grid *Grid[T], idx uint8, object T) {
+func (p *page[T]) delObject(idx uint8, object T) (value uint32) {
 	p.Lock()
 	if p.state != nil {
 		delete(p.state, object)
 	}
+	value = p.tileAt(idx)
 	p.Unlock()
-
-	// If observed, notify the observers of the tile
-	if p.IsObserved() {
-		value := p.tileAt(idx)
-		grid.observers.Notify(p.point, &Update[T]{
-			Point: pointOf(p.point, idx),
-			Old:   value,
-			New:   value,
-			Del:   object,
-		})
-	}
+	return
 }
 
 // ---------------------------------- Tile Cursor ----------------------------------
@@ -337,28 +335,33 @@ type Tile[T comparable] struct {
 }
 
 // Count returns number of objects at the current tile.
-func (c Tile[T]) Count() (count int) {
-	c.data.Lock()
-	defer c.data.Unlock()
-	for _, idx := range c.data.state {
-		if idx == uint8(c.idx) {
+func (t Tile[T]) Count() (count int) {
+	t.data.Lock()
+	defer t.data.Unlock()
+	for _, idx := range t.data.state {
+		if idx == uint8(t.idx) {
 			count++
 		}
 	}
 	return
 }
 
+// Point returns the point of the tile
+func (t Tile[T]) Point() Point {
+	return pointOf(t.data.point, t.idx)
+}
+
 // Value reads the tile information
-func (c Tile[T]) Value() Value {
-	return c.data.tileAt(c.idx)
+func (t Tile[T]) Value() Value {
+	return t.data.tileAt(t.idx)
 }
 
 // Range iterates over all of the objects in the set
-func (c Tile[T]) Range(fn func(T) error) error {
-	c.data.Lock()
-	defer c.data.Unlock()
-	for v, idx := range c.data.state {
-		if idx == uint8(c.idx) {
+func (t Tile[T]) Range(fn func(T) error) error {
+	t.data.Lock()
+	defer t.data.Unlock()
+	for v, idx := range t.data.state {
+		if idx == uint8(t.idx) {
 			if err := fn(v); err != nil {
 				return err
 			}
@@ -368,42 +371,115 @@ func (c Tile[T]) Range(fn func(T) error) error {
 }
 
 // Observers iterates over all views observing this tile
-func (c Tile[T]) Observers(fn func(view Observer[T])) {
-	if !c.data.IsObserved() {
-		return
+func (t Tile[T]) Observers(fn func(view Observer[T])) {
+	if t.data.IsObserved() {
+		t.grid.observers.Each1(fn, t.data.point, t.Point())
 	}
-
-	c.grid.observers.Each(c.data.point, func(sub Observer[T]) {
-		if view, ok := sub.(Observer[T]); ok {
-			fn(view)
-		}
-	})
 }
 
 // Add adds object to the set
-func (c Tile[T]) Add(v T) {
-	c.data.addObject(c.grid, c.idx, v)
+func (t Tile[T]) Add(v T) {
+	value := t.data.addObject(t.idx, v)
+
+	// If observed, notify the observers of the tile
+	if t.data.IsObserved() {
+		at := t.Point()
+		t.grid.observers.Notify1(&Update[T]{
+			Old: UpdateState[T]{
+				Point: at,
+				Value: value,
+				Add:   v,
+			},
+			New: UpdateState[T]{
+				Point: at,
+				Value: value,
+				Add:   v,
+			},
+		}, t.data.point, at)
+	}
 }
 
 // Del removes the object from the set
-func (c Tile[T]) Del(v T) {
-	c.data.delObject(c.grid, c.idx, v)
+func (t Tile[T]) Del(v T) {
+	value := t.data.delObject(t.idx, v)
+
+	// If observed, notify the observers of the tile
+	if t.data.IsObserved() {
+		at := t.Point()
+		t.grid.observers.Notify1(&Update[T]{
+			Old: UpdateState[T]{
+				Point: at,
+				Value: value,
+				Del:   v,
+			},
+			New: UpdateState[T]{
+				Point: at,
+				Value: value,
+				Del:   v,
+			},
+		}, t.data.point, at)
+	}
+}
+
+// Move moves an object from the current tile to the destination tile.
+func (t Tile[T]) Move(v T, dst Point) bool {
+	d, ok := t.grid.At(dst.X, dst.Y)
+	if !ok {
+		return false
+	}
+
+	// Move the object from the source to the destination
+	tv := t.data.delObject(d.idx, v)
+	dv := d.data.addObject(d.idx, v)
+	if !t.data.IsObserved() && !d.data.IsObserved() {
+		return true
+	}
+
+	// Prepare the update notification
+	update := &Update[T]{
+		Old: UpdateState[T]{
+			Point: t.Point(),
+			Value: tv,
+			Del:   v,
+		},
+		New: UpdateState[T]{
+			Point: d.Point(),
+			Value: dv,
+			Add:   v,
+		},
+	}
+
+	switch {
+	case t.data == d.data || !d.data.IsObserved():
+		t.grid.observers.Notify1(update, t.data.point, t.Point())
+	case !t.data.IsObserved():
+		t.grid.observers.Notify1(update, d.data.point, d.Point())
+	default:
+		t.grid.observers.Notify2(update, [2]Point{
+			t.data.point,
+			d.data.point,
+		}, [2]Point{
+			t.Point(),
+			d.Point(),
+		})
+	}
+	return true
 }
 
 // Write updates the entire tile value.
-func (c Tile[T]) Write(tile Value) {
-	c.data.writeTile(c.grid, c.idx, tile)
+func (t Tile[T]) Write(tile Value) {
+	t.data.writeTile(t.grid, t.idx, tile)
 }
 
 // Merge atomically merges the tile by applying a merging function.
-func (c Tile[T]) Merge(merge func(Value) Value) Value {
-	return c.data.mergeTile(c.grid, c.idx, merge)
+func (t Tile[T]) Merge(merge func(Value) Value) Value {
+	return t.data.mergeTile(t.grid, t.idx, merge)
 }
 
 // Mask updates the bits of tile. The bits are specified by the mask. The bits
 // that need to be updated should be flipped on in the mask.
-func (c Tile[T]) Mask(tile, mask Value) Value {
-	return c.data.mergeTile(c.grid, c.idx, func(value Value) Value {
+func (t Tile[T]) Mask(tile, mask Value) Value {
+	return t.data.mergeTile(t.grid, t.idx, func(value Value) Value {
 		return (value &^ mask) | (tile & mask)
 	})
 }
