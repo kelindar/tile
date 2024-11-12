@@ -4,6 +4,7 @@
 package tile
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -19,14 +20,16 @@ func TestPath(t *testing.T) {
 	path, dist, found := m.Path(At(1, 1), At(7, 7), costOf)
 	assert.Equal(t, `
 .........
-. x .   .
-. x... ..
-. xxx. ..
-... x.  .
-.   xx  .
+.x  .   .
+.x ... ..
+.xxx . ..
+...x .  .
+.  xxx  .
 .....x...
-.    xx .
+.    xxx.
 .........`, plotPath(m, path))
+
+	fmt.Println(plotPath(m, path))
 	assert.Equal(t, 12, dist)
 	assert.True(t, found)
 }
@@ -35,12 +38,12 @@ func TestPathTiny(t *testing.T) {
 	m := NewGrid(6, 6)
 	path, dist, found := m.Path(At(0, 0), At(5, 5), costOf)
 	assert.Equal(t, `
- x    
- x    
- x    
- x    
- x    
- xxxx `, plotPath(m, path))
+x     
+x     
+x     
+x     
+x     
+xxxxxx`, plotPath(m, path))
 	assert.Equal(t, 10, dist)
 	assert.True(t, found)
 }
@@ -51,12 +54,15 @@ func TestDraw(t *testing.T) {
 	assert.NotNil(t, out)
 }
 
-// BenchmarkPath/9x9-8         	  210472	      5316 ns/op	   16468 B/op	       3 allocs/op
-// BenchmarkPath/300x300-8     	     463	   2546373 ns/op	 7801135 B/op	       4 allocs/op
-// BenchmarkPath/381x381-8     	     373	   2732657 ns/op	62394362 B/op	       4 allocs/op
-// BenchmarkPath/384x384-8     	     153	   7791925 ns/op	62396304 B/op	       5 allocs/op
-// BenchmarkPath/6144x6144-8   	     158	   7468206 ns/op	62395377 B/op	       3 allocs/op
-// BenchmarkPath/6147x6147-8   	     160	   7468716 ns/op	62395359 B/op	       3 allocs/op
+/*
+BenchmarkPath/9x9-24         	 2704395	       440.4 ns/op	     256 B/op	       1 allocs/op
+BenchmarkPath/300x300-24     	    1134	   1033808 ns/op	    3845 B/op	       4 allocs/op
+BenchmarkPath/381x381-24     	    2782	    377676 ns/op	    7298 B/op	       5 allocs/op
+BenchmarkPath/384x384-24     	    2716	    382663 ns/op	    7298 B/op	       5 allocs/op
+BenchmarkPath/3069x3069-24   	     847	   1368243 ns/op	  100140 B/op	       7 allocs/op
+BenchmarkPath/3072x3072-24   	     849	   1368387 ns/op	   99954 B/op	       7 allocs/op
+BenchmarkPath/6144x6144-24   	    3050	    387195 ns/op	   12802 B/op	       5 allocs/op
+*/
 func BenchmarkPath(b *testing.B) {
 	b.Run("9x9", func(b *testing.B) {
 		m := mapFrom("9x9.png")
@@ -122,9 +128,12 @@ func BenchmarkPath(b *testing.B) {
 	})
 }
 
-// BenchmarkAround/3r-8         	  352876	      3355 ns/op	     385 B/op	       1 allocs/op
-// BenchmarkAround/5r-8         	  162103	      7551 ns/op	     931 B/op	       2 allocs/op
-// BenchmarkAround/10r-8        	   62491	     19235 ns/op	    3489 B/op	       2 allocs/op
+/*
+cpu: 13th Gen Intel(R) Core(TM) i7-13700K
+BenchmarkAround/3r-24 	 2080566	     562.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAround/5r-24 	  885582	      1358 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAround/10r-24    300672	      3953 ns/op	       0 B/op	       0 allocs/op
+*/
 func BenchmarkAround(b *testing.B) {
 	m := mapFrom("300x300.png")
 	b.Run("3r", func(b *testing.B) {
@@ -175,38 +184,19 @@ func TestAroundMiss(t *testing.T) {
 	})
 }
 
-// BenchmarkHeap-8   	   94454	     12303 ns/op	    3968 B/op	       5 allocs/op
+/*
+cpu: 13th Gen Intel(R) Core(TM) i7-13700K
+BenchmarkHeap-24    	  240228	      5076 ns/op	    6016 B/op	      68 allocs/op
+*/
 func BenchmarkHeap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		h := newHeap32(16)
+		h := newFrontier()
 		for j := 0; j < 128; j++ {
 			h.Push(rand(j), 1)
 		}
 		for j := 0; j < 128*10; j++ {
 			h.Push(rand(j), 1)
 			h.Pop()
-		}
-	}
-}
-
-func TestHeap(t *testing.T) {
-	h := newHeap32(16)
-	h.Push(1, 0)
-	h.Pop()
-}
-
-func TestNewHeap(t *testing.T) {
-	h := newHeap32(16)
-	for j := 0; j < 8; j++ {
-		h.Push(rand(j), uint32(j))
-	}
-
-	val, _ := h.Pop()
-	for j := 1; j < 128; j++ {
-		newval, ok := h.Pop()
-		if ok {
-			assert.True(t, val < newval)
-			val = newval
 		}
 	}
 }
