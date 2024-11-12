@@ -183,19 +183,6 @@ func (h *heap32) Pop() (uint32, bool) {
 	return h.pop(), true
 }
 
-// Remove removes and returns the element at index i from the heap.
-// The complexity is O(log n) where n = h.Len().
-/*func (h *heap32) Remove(i int) uint32 {
-	n := h.Len() - 1
-	if n != i {
-		h.Swap(i, n)
-		if !h.down(i, n) {
-			h.up(i)
-		}
-	}
-	return h.pop()
-}*/
-
 func (h *heap32) pop() uint32 {
 	old := *h
 	n := len(old)
