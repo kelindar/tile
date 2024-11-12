@@ -5,7 +5,7 @@ package tile
 
 import (
 	"testing"
-	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -82,7 +82,7 @@ func TestView(t *testing.T) {
 	before := cursor.Value()
 	v.WriteAt(5, 5, Value(55))
 	update := <-v.Inbox
-	assert.Equal(t, At(5, 5), update.Point)
+	assert.Equal(t, At(5, 5), update.New.Point)
 	assert.NotEqual(t, before, update.New)
 
 	// Merge a tile in view, but with zero mask (won't do anything)
@@ -90,8 +90,8 @@ func TestView(t *testing.T) {
 	before = cursor.Value()
 	v.MergeAt(5, 5, Value(66), Value(0)) // zero mask
 	update = <-v.Inbox
-	assert.Equal(t, At(5, 5), update.Point)
-	assert.Equal(t, before, update.New)
+	assert.Equal(t, At(5, 5), update.New.Point)
+	assert.Equal(t, before, update.New.Value)
 
 	// Close the view
 	assert.NoError(t, v.Close())
@@ -99,6 +99,7 @@ func TestView(t *testing.T) {
 	assert.Equal(t, 0, len(v.Inbox))
 }
 
+/*
 func TestObservers(t *testing.T) {
 	ev := newObservers[uint32]()
 	assert.NotNil(t, ev)
@@ -128,20 +129,12 @@ func TestObservers(t *testing.T) {
 	ev.Notify(&Update[uint32]{Point: At(2, 0)})
 	assert.Equal(t, 6, count)
 }
+*/
 
-func TestObserversNil(t *testing.T) {
-	assert.NotPanics(t, func() {
-		var ev *observers[uint32]
-		ev.Notify(&Update[uint32]{Point: At(1, 0)})
-	})
-}
-
-func TestStateUpdates(t *testing.T) {
+func TestUpdates_Simple(t *testing.T) {
 	m := mapFrom("300x300.png")
-
-	// Create a new view
 	c := counter(0)
-	v := NewView[string, string](m, "view 1")
+	v := NewView(m, "view 1")
 	v.Resize(NewRect(0, 0, 10, 10), c.count)
 
 	assert.NotNil(t, v)
@@ -151,34 +144,54 @@ func TestStateUpdates(t *testing.T) {
 	cursor, _ := v.At(5, 5)
 	cursor.Write(Value(0xF0))
 	assert.Equal(t, Update[string]{
-		Point: At(5, 5),
-		New:   Value(0xF0),
+		Old: ValueAt{
+			Point: At(5, 5),
+		},
+		New: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xF0),
+		},
 	}, <-v.Inbox)
 
 	// Add an object to an observed tile
 	cursor.Add("A")
 	assert.Equal(t, Update[string]{
-		Point: At(5, 5),
-		Old:   Value(0xF0),
-		New:   Value(0xF0),
-		Add:   "A",
+		Old: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xF0),
+		},
+		New: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xF0),
+		},
+		Add: "A",
 	}, <-v.Inbox)
 
 	// Delete an object from an observed tile
 	cursor.Del("A")
 	assert.Equal(t, Update[string]{
-		Point: At(5, 5),
-		Old:   Value(0xF0),
-		New:   Value(0xF0),
-		Del:   "A",
+		Old: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xF0),
+		},
+		New: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xF0),
+		},
+		Del: "A",
 	}, <-v.Inbox)
 
 	// Mask a tile in view
 	cursor.Mask(0xFF, 0x0F)
 	assert.Equal(t, Update[string]{
-		Point: At(5, 5),
-		Old:   Value(0xF0),
-		New:   Value(0xFF),
+		Old: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xF0),
+		},
+		New: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xFF),
+		},
 	}, <-v.Inbox)
 
 	// Merge a tile in view
@@ -186,18 +199,87 @@ func TestStateUpdates(t *testing.T) {
 		return 0xAA
 	})
 	assert.Equal(t, Update[string]{
-		Point: At(5, 5),
-		Old:   Value(0xFF),
-		New:   Value(0xAA),
+		Old: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xFF),
+		},
+		New: ValueAt{
+			Point: At(5, 5),
+			Value: Value(0xAA),
+		},
 	}, <-v.Inbox)
 }
 
-func TestObservers_MoveIncremental(t *testing.T) {
+func TestMove_Within(t *testing.T) {
+	m := mapFrom("300x300.png")
+	c := counter(0)
+	v := NewView(m, "view 1")
+	v.Resize(NewRect(0, 0, 10, 10), c.count)
+
+	// Add an object to an observed tile. This should only fire once since
+	// both the old and new states are the observed by the view.
+	cursor, _ := v.At(5, 5)
+	cursor.Move("A", At(6, 6))
+	assert.Equal(t, Update[string]{
+		Old: ValueAt{
+			Point: At(5, 5),
+		},
+		New: ValueAt{
+			Point: At(6, 6),
+		},
+		Del: "A",
+		Add: "A",
+	}, <-v.Inbox)
+}
+
+func TestMove_Incoming(t *testing.T) {
+	m := mapFrom("300x300.png")
+	c := counter(0)
+	v := NewView(m, "view 1")
+	v.Resize(NewRect(0, 0, 10, 10), c.count)
+
+	// Add an object to an observed tile from outside the view.
+	cursor, _ := v.At(20, 20)
+	cursor.Move("A", At(5, 5))
+	assert.Equal(t, Update[string]{
+		Old: ValueAt{
+			Point: At(20, 20),
+		},
+		New: ValueAt{
+			Point: At(5, 5),
+		},
+		Del: "A",
+		Add: "A",
+	}, <-v.Inbox)
+}
+
+func TestMove_Outgoing(t *testing.T) {
+	m := mapFrom("300x300.png")
+	c := counter(0)
+	v := NewView(m, "view 1")
+	v.Resize(NewRect(0, 0, 10, 10), c.count)
+
+	// Move an object from an observed tile outside of the view.
+	cursor, _ := v.At(5, 5)
+	cursor.Move("A", At(20, 20))
+	assert.Equal(t, Update[string]{
+		Old: ValueAt{
+			Point: At(5, 5),
+		},
+		New: ValueAt{
+			Point: At(20, 20),
+		},
+		Del: "A",
+		Add: "A",
+	}, <-v.Inbox)
+}
+
+func TestView_MoveTo(t *testing.T) {
 	m := mapFrom("300x300.png")
 
 	// Create a new view
 	c := counter(0)
-	v := NewView[string, string](m, "view 1")
+	v := NewView(m, "view 1")
 	v.Resize(NewRect(10, 10, 12, 12), c.count)
 
 	assert.NotNil(t, v)
@@ -233,6 +315,10 @@ func TestObservers_MoveIncremental(t *testing.T) {
 	// Count the number of observers, should be the same as before
 	assert.Equal(t, 9, countObservers(m))
 	assert.NoError(t, v.Close())
+}
+
+func TestSizeUpdate(t *testing.T) {
+	assert.Equal(t, 24, int(unsafe.Sizeof(Update[uint32]{})))
 }
 
 // ---------------------------------- Mocks ----------------------------------

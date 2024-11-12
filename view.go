@@ -15,13 +15,18 @@ type Observer[T comparable] interface {
 	onUpdate(*Update[T])
 }
 
+// ValueAt represents a tile and its value.
+type ValueAt struct {
+	Point // The point of the tile
+	Value // The value of the tile
+}
+
 // Update represents a tile update notification.
 type Update[T comparable] struct {
-	Point       // The tile location
-	Old   Value // Old tile value
-	New   Value // New tile value
-	Add   T     // An object was added to the tile
-	Del   T     // An object was removed from the tile
+	Old ValueAt // Old tile + value
+	New ValueAt // New tile + value
+	Add T       // An object was added to the tile
+	Del T       // An object was removed from the tile
 }
 
 var _ Observer[string] = (*View[string, string])(nil)
@@ -155,49 +160,82 @@ func (v *View[S, T]) Close() error {
 
 // onUpdate occurs when a tile has updated.
 func (v *View[S, T]) onUpdate(ev *Update[T]) {
-	if v.Viewport().Contains(ev.Point) {
-		v.Inbox <- *ev // (copy)
-	}
+	v.Inbox <- *ev // (copy)
 }
 
 // -----------------------------------------------------------------------------
 
 // Pubsub represents a publish/subscribe layer for observers.
 type pubsub[T comparable] struct {
-	m sync.Map
-}
-
-// Notify notifies listeners of an update that happened.
-func (p *pubsub[T]) Notify(page Point, ev *Update[T]) {
-	if v, ok := p.m.Load(page.Integer()); ok {
-		v.(*observers[T]).Notify(ev)
-	}
-}
-
-// Each iterates over each observer in a page
-func (p *pubsub[T]) Each(page Point, fn func(sub Observer[T])) {
-	if v, ok := p.m.Load(page.Integer()); ok {
-		v.(*observers[T]).Each(fn)
-	}
+	m   sync.Map  // Concurrent map of observers
+	tmp sync.Pool // Temporary observer sets for notifications
 }
 
 // Subscribe registers an event listener on a system
-func (p *pubsub[T]) Subscribe(at Point, sub Observer[T]) bool {
-	if v, ok := p.m.Load(at.Integer()); ok {
+func (p *pubsub[T]) Subscribe(page Point, sub Observer[T]) bool {
+	if v, ok := p.m.Load(page.Integer()); ok {
 		return v.(*observers[T]).Subscribe(sub)
 	}
 
 	// Slow path
-	v, _ := p.m.LoadOrStore(at.Integer(), newObservers[T]())
+	v, _ := p.m.LoadOrStore(page.Integer(), newObservers[T]())
 	return v.(*observers[T]).Subscribe(sub)
 }
 
 // Unsubscribe deregisters an event listener from a system
-func (p *pubsub[T]) Unsubscribe(at Point, sub Observer[T]) bool {
-	if v, ok := p.m.Load(at.Integer()); ok {
+func (p *pubsub[T]) Unsubscribe(page Point, sub Observer[T]) bool {
+	if v, ok := p.m.Load(page.Integer()); ok {
 		return v.(*observers[T]).Unsubscribe(sub)
 	}
 	return false
+}
+
+// Notify notifies listeners of an update that happened.
+func (p *pubsub[T]) Notify1(ev *Update[T], page, at Point) {
+	p.Each1(func(sub Observer[T]) {
+		sub.onUpdate(ev)
+	}, page, at)
+}
+
+// Notify notifies listeners of an update that happened.
+func (p *pubsub[T]) Notify2(ev *Update[T], pages, locs [2]Point) {
+	p.Each2(func(sub Observer[T]) {
+		sub.onUpdate(ev)
+	}, pages, locs)
+}
+
+// Each iterates over each observer in a page
+func (p *pubsub[T]) Each1(fn func(sub Observer[T]), page, at Point) {
+	if v, ok := p.m.Load(page.Integer()); ok {
+		v.(*observers[T]).Each(func(sub Observer[T]) {
+			if sub.Viewport().Contains(at) {
+				fn(sub)
+			}
+		})
+	}
+}
+
+// Each2 iterates over each observer in a page
+func (p *pubsub[T]) Each2(fn func(sub Observer[T]), pages, locs [2]Point) {
+	targets := p.tmp.Get().(map[Observer[T]]struct{})
+	clear(targets)
+	defer p.tmp.Put(targets)
+
+	// Collect all observers from all pages
+	for _, page := range pages {
+		if v, ok := p.m.Load(page.Integer()); ok {
+			v.(*observers[T]).Each(func(sub Observer[T]) {
+				targets[sub] = struct{}{}
+			})
+		}
+	}
+
+	// Invoke the callback for each observer, once
+	for sub := range targets {
+		if sub.Viewport().Contains(locs[0]) || sub.Viewport().Contains(locs[1]) {
+			fn(sub)
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -214,13 +252,6 @@ func newObservers[T comparable]() *observers[T] {
 	return &observers[T]{
 		subs: make([]Observer[T], 0, 8),
 	}
-}
-
-// Notify notifies listeners of an update that happened.
-func (s *observers[T]) Notify(ev *Update[T]) {
-	s.Each(func(sub Observer[T]) {
-		sub.onUpdate(ev)
-	})
 }
 
 // Each iterates over each observer
