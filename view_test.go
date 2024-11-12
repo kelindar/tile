@@ -5,6 +5,7 @@ package tile
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -143,10 +144,10 @@ func TestUpdates_Simple(t *testing.T) {
 	cursor, _ := v.At(5, 5)
 	cursor.Write(Value(0xF0))
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xF0),
 		},
@@ -155,41 +156,39 @@ func TestUpdates_Simple(t *testing.T) {
 	// Add an object to an observed tile
 	cursor.Add("A")
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xF0),
-			Add:   "A",
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xF0),
-			Add:   "A",
 		},
+		Add: "A",
 	}, <-v.Inbox)
 
 	// Delete an object from an observed tile
 	cursor.Del("A")
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xF0),
-			Del:   "A",
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xF0),
-			Del:   "A",
 		},
+		Del: "A",
 	}, <-v.Inbox)
 
 	// Mask a tile in view
 	cursor.Mask(0xFF, 0x0F)
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xF0),
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xFF),
 		},
@@ -200,11 +199,11 @@ func TestUpdates_Simple(t *testing.T) {
 		return 0xAA
 	})
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xFF),
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(5, 5),
 			Value: Value(0xAA),
 		},
@@ -222,14 +221,14 @@ func TestMove_Within(t *testing.T) {
 	cursor, _ := v.At(5, 5)
 	cursor.Move("A", At(6, 6))
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
-			Del:   "A",
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(6, 6),
-			Add:   "A",
 		},
+		Del: "A",
+		Add: "A",
 	}, <-v.Inbox)
 }
 
@@ -243,14 +242,14 @@ func TestMove_Incoming(t *testing.T) {
 	cursor, _ := v.At(20, 20)
 	cursor.Move("A", At(5, 5))
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(20, 20),
-			Del:   "A",
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(5, 5),
-			Add:   "A",
 		},
+		Del: "A",
+		Add: "A",
 	}, <-v.Inbox)
 }
 
@@ -264,14 +263,14 @@ func TestMove_Outgoing(t *testing.T) {
 	cursor, _ := v.At(5, 5)
 	cursor.Move("A", At(20, 20))
 	assert.Equal(t, Update[string]{
-		Old: UpdateState[string]{
+		Old: ValueAt{
 			Point: At(5, 5),
-			Del:   "A",
 		},
-		New: UpdateState[string]{
+		New: ValueAt{
 			Point: At(20, 20),
-			Add:   "A",
 		},
+		Del: "A",
+		Add: "A",
 	}, <-v.Inbox)
 }
 
@@ -316,6 +315,10 @@ func TestView_MoveTo(t *testing.T) {
 	// Count the number of observers, should be the same as before
 	assert.Equal(t, 9, countObservers(m))
 	assert.NoError(t, v.Close())
+}
+
+func TestSizeUpdate(t *testing.T) {
+	assert.Equal(t, 24, int(unsafe.Sizeof(Update[uint32]{})))
 }
 
 // ---------------------------------- Mocks ----------------------------------

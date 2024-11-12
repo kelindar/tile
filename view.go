@@ -15,18 +15,18 @@ type Observer[T comparable] interface {
 	onUpdate(*Update[T])
 }
 
-type UpdateState[T comparable] struct {
-	Point   // The point of the tile
-	Value   // The value of the tile
-	Add   T // An object was added to the tile
-	Del   T // An object was removed from the tile
+// ValueAt represents a tile and its value.
+type ValueAt struct {
+	Point // The point of the tile
+	Value // The value of the tile
 }
 
 // Update represents a tile update notification.
 type Update[T comparable] struct {
-	Old UpdateState[T] // Old tile + value
-	New UpdateState[T] // New tile + value
-
+	Old ValueAt // Old tile + value
+	New ValueAt // New tile + value
+	Add T       // An object was added to the tile
+	Del T       // An object was removed from the tile
 }
 
 var _ Observer[string] = (*View[string, string])(nil)
@@ -171,6 +171,25 @@ type pubsub[T comparable] struct {
 	tmp sync.Pool // Temporary observer sets for notifications
 }
 
+// Subscribe registers an event listener on a system
+func (p *pubsub[T]) Subscribe(page Point, sub Observer[T]) bool {
+	if v, ok := p.m.Load(page.Integer()); ok {
+		return v.(*observers[T]).Subscribe(sub)
+	}
+
+	// Slow path
+	v, _ := p.m.LoadOrStore(page.Integer(), newObservers[T]())
+	return v.(*observers[T]).Subscribe(sub)
+}
+
+// Unsubscribe deregisters an event listener from a system
+func (p *pubsub[T]) Unsubscribe(page Point, sub Observer[T]) bool {
+	if v, ok := p.m.Load(page.Integer()); ok {
+		return v.(*observers[T]).Unsubscribe(sub)
+	}
+	return false
+}
+
 // Notify notifies listeners of an update that happened.
 func (p *pubsub[T]) Notify1(ev *Update[T], page, at Point) {
 	p.Each1(func(sub Observer[T]) {
@@ -217,58 +236,6 @@ func (p *pubsub[T]) Each2(fn func(sub Observer[T]), pages, locs [2]Point) {
 			fn(sub)
 		}
 	}
-}
-
-/*
-// Each iterates over each observer in a page
-func (p *pubsub[T]) Each(fn func(sub Observer[T]), pages ...Point) {
-	switch len(pages) {
-
-	// Single page: directly invoke the callback
-	case 1:
-		if v, ok := p.m.Load(pages[0].Integer()); ok {
-			v.(*observers[T]).Each(fn)
-		}
-
-	// Multiple pages: merge distinct observers and invoke the callback
-	default:
-		targets := p.tmp.Get().(map[Observer[T]]struct{})
-		clear(targets)
-		defer p.tmp.Put(targets)
-
-		// Collect all observers from all pages
-		for _, page := range pages {
-			if v, ok := p.m.Load(page.Integer()); ok {
-				v.(*observers[T]).Each(func(sub Observer[T]) {
-					targets[sub] = struct{}{}
-				})
-			}
-		}
-
-		// Invoke the callback for each observer, once
-		for sub := range targets {
-			fn(sub)
-		}
-	}
-}*/
-
-// Subscribe registers an event listener on a system
-func (p *pubsub[T]) Subscribe(page Point, sub Observer[T]) bool {
-	if v, ok := p.m.Load(page.Integer()); ok {
-		return v.(*observers[T]).Subscribe(sub)
-	}
-
-	// Slow path
-	v, _ := p.m.LoadOrStore(page.Integer(), newObservers[T]())
-	return v.(*observers[T]).Subscribe(sub)
-}
-
-// Unsubscribe deregisters an event listener from a system
-func (p *pubsub[T]) Unsubscribe(page Point, sub Observer[T]) bool {
-	if v, ok := p.m.Load(page.Integer()); ok {
-		return v.(*observers[T]).Unsubscribe(sub)
-	}
-	return false
 }
 
 // -----------------------------------------------------------------------------

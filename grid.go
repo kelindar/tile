@@ -256,11 +256,11 @@ func (p *page[T]) writeTile(grid *Grid[T], idx uint8, after Value) {
 	if p.IsObserved() {
 		at := pointOf(p.point, idx)
 		grid.observers.Notify1(&Update[T]{
-			Old: UpdateState[T]{
+			Old: ValueAt{
 				Point: at,
 				Value: before,
 			},
-			New: UpdateState[T]{
+			New: ValueAt{
 				Point: at,
 				Value: after,
 			},
@@ -283,11 +283,11 @@ func (p *page[T]) mergeTile(grid *Grid[T], idx uint8, fn func(Value) Value) Valu
 	if p.IsObserved() {
 		at := pointOf(p.point, idx)
 		grid.observers.Notify1(&Update[T]{
-			Old: UpdateState[T]{
+			Old: ValueAt{
 				Point: at,
 				Value: before,
 			},
-			New: UpdateState[T]{
+			New: ValueAt{
 				Point: at,
 				Value: after,
 			},
@@ -385,16 +385,15 @@ func (t Tile[T]) Add(v T) {
 	if t.data.IsObserved() {
 		at := t.Point()
 		t.grid.observers.Notify1(&Update[T]{
-			Old: UpdateState[T]{
+			Old: ValueAt{
 				Point: at,
 				Value: value,
-				Add:   v,
 			},
-			New: UpdateState[T]{
+			New: ValueAt{
 				Point: at,
 				Value: value,
-				Add:   v,
 			},
+			Add: v,
 		}, t.data.point, at)
 	}
 }
@@ -407,16 +406,15 @@ func (t Tile[T]) Del(v T) {
 	if t.data.IsObserved() {
 		at := t.Point()
 		t.grid.observers.Notify1(&Update[T]{
-			Old: UpdateState[T]{
+			Old: ValueAt{
 				Point: at,
 				Value: value,
-				Del:   v,
 			},
-			New: UpdateState[T]{
+			New: ValueAt{
 				Point: at,
 				Value: value,
-				Del:   v,
 			},
+			Del: v,
 		}, t.data.point, at)
 	}
 }
@@ -437,16 +435,16 @@ func (t Tile[T]) Move(v T, dst Point) bool {
 
 	// Prepare the update notification
 	update := &Update[T]{
-		Old: UpdateState[T]{
+		Old: ValueAt{
 			Point: t.Point(),
 			Value: tv,
-			Del:   v,
 		},
-		New: UpdateState[T]{
+		New: ValueAt{
 			Point: d.Point(),
 			Value: dv,
-			Add:   v,
 		},
+		Del: v,
+		Add: v,
 	}
 
 	switch {
