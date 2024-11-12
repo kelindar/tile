@@ -5,7 +5,10 @@ package tile
 
 import (
 	"math"
+	"math/bits"
 	"sync"
+
+	"github.com/kelindar/intmap"
 )
 
 type costFn = func(Value) uint16
@@ -25,19 +28,20 @@ func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Poi
 
 	fn(from, start)
 
-	// Acquire a frontier heap for search
-	frontier := acquireHeap()
-	frontier.Push(from.Integer(), 0)
-	defer releaseHeap(frontier)
-
 	// For pre-allocating, we use πr2 since BFS will result in a approximation
 	// of a circle, in the worst case.
 	maxArea := int(math.Ceil(math.Pi * float64(distance*distance)))
-	reached := make(map[uint32]struct{}, maxArea)
-	reached[from.Integer()] = struct{}{}
 
+	// Acquire a frontier heap for search
+	state := acquire(maxArea)
+	frontier := state.frontier
+	reached := state.edges
+	defer release(state)
+
+	frontier.Push(from.Integer(), 0)
+	reached.Store(from.Integer(), 0)
 	for !frontier.IsEmpty() {
-		pCurr, _ := frontier.Pop()
+		pCurr := frontier.Pop()
 		current := unpackPoint(pCurr)
 
 		// Get all of the neighbors
@@ -52,9 +56,9 @@ func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Poi
 
 			// Add to the search queue
 			pNext := next.Integer()
-			if _, ok := reached[pNext]; !ok {
+			if _, ok := reached.Load(pNext); !ok {
 				frontier.Push(pNext, 1)
-				reached[pNext] = struct{}{}
+				reached.Store(pNext, 1)
 				fn(next, nextTile)
 			}
 		})
@@ -63,177 +67,190 @@ func (m *Grid[T]) Around(from Point, distance uint32, costOf costFn, fn func(Poi
 
 // Path calculates a short path and the distance between the two locations
 func (m *Grid[T]) Path(from, to Point, costOf costFn) ([]Point, int, bool) {
-
-	// Acquire a frontier heap for search
-	frontier := acquireHeap()
-	frontier.Push(from.Integer(), 0)
-	defer releaseHeap(frontier)
+	distance := float64(from.DistanceTo(to))
+	maxArea := int(math.Ceil(math.Pi * float64(distance*distance)))
 
 	// For pre-allocating, we use πr2 since BFS will result in a approximation
 	// of a circle, in the worst case.
-	distance := float64(from.DistanceTo(to))
-	maxArea := int(math.Ceil(math.Pi * float64(distance*distance)))
-	edges := make(map[uint32]edge, maxArea)
-	edges[from.Integer()] = edge{
-		Point: from,
-		Cost:  0,
-	}
+	state := acquire(maxArea)
+	edges := state.edges
+	frontier := state.frontier
+	defer release(state)
+
+	frontier.Push(from.Integer(), 0)
+	edges.Store(from.Integer(), encode(0, Direction(0))) // Starting point has no direction
 
 	for !frontier.IsEmpty() {
-		pCurr, _ := frontier.Pop()
+		pCurr := frontier.Pop()
 		current := unpackPoint(pCurr)
 
-		// We have a path to the goal
+		// Decode the cost to reach the current point
+		currentEncoded, _ := edges.Load(pCurr)
+		currentCost, _ := decode(currentEncoded)
+
+		// Check if we've reached the destination
 		if current.Equal(to) {
-			dist := int(edges[current.Integer()].Cost)
-			path := make([]Point, 0, dist)
-			curr, _ := edges[current.Integer()]
-			for !curr.Point.Equal(from) {
-				path = append(path, curr.Point)
-				curr = edges[curr.Point.Integer()]
+
+			// Reconstruct the path
+			path := make([]Point, 0, 64)
+			path = append(path, current)
+			for !current.Equal(from) {
+				currentEncoded, _ := edges.Load(current.Integer())
+				_, dir := decode(currentEncoded)
+				current = current.Move(oppositeDirection(dir))
+				path = append(path, current)
 			}
 
-			return path, dist, true
+			// Reverse the path to get from source to destination
+			for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+				path[i], path[j] = path[j], path[i]
+			}
+
+			return path, int(currentCost), true
 		}
 
-		// Get all of the neighbors
+		// Explore neighbors
 		m.Neighbors(current.X, current.Y, func(next Point, nextTile Tile[T]) {
 			cNext := costOf(nextTile.Value())
 			if cNext == 0 {
-				return // Blocked tile, ignore completely
+				return // Blocked tile
 			}
 
+			nextCost := currentCost + uint32(cNext)
 			pNext := next.Integer()
-			newCost := edges[pCurr].Cost + uint32(cNext) // cost(current, next)
 
-			if e, ok := edges[pNext]; !ok || newCost < e.Cost {
-				priority := newCost + next.DistanceTo(to) // heuristic
-				frontier.Push(next.Integer(), priority)
+			existingEncoded, visited := edges.Load(pNext)
+			existingCost, _ := decode(existingEncoded)
 
-				edges[pNext] = edge{
-					Point: current,
-					Cost:  newCost,
-				}
+			// If we haven't visited this node or we found a better path
+			if !visited || nextCost < existingCost {
+				angle := angleOf(current, next)
+				priority := nextCost + next.DistanceTo(to)
+
+				// Store the edge and push to the frontier
+				edges.Store(pNext, encode(nextCost, angle))
+				frontier.Push(pNext, priority)
 			}
-
 		})
 	}
 
 	return nil, 0, false
 }
 
-// -----------------------------------------------------------------------------
-
-var heapPool = sync.Pool{
-	New: func() interface{} { return new(heap32) },
+// encode packs the cost and direction into a uint32
+func encode(cost uint32, dir Direction) uint32 {
+	return (cost << 4) | uint32(dir&0xF)
 }
 
-// Acquires a new instance of a heap
-func acquireHeap() *heap32 {
-	h := heapPool.Get().(*heap32)
-	h.Reset()
+// decode unpacks the cost and direction from a uint32
+func decode(value uint32) (cost uint32, dir Direction) {
+	cost = value >> 4
+	dir = Direction(value & 0xF)
+	return
+}
+
+// -----------------------------------------------------------------------------
+
+type pathfinder struct {
+	edges    *intmap.Map
+	frontier *frontier
+}
+
+var pathfinders = sync.Pool{
+	New: func() any {
+		return &pathfinder{
+			edges:    intmap.New(32, .95),
+			frontier: newFrontier(),
+		}
+	},
+}
+
+// Acquires a new instance of a pathfinding state
+func acquire(capacity int) *pathfinder {
+	v := pathfinders.Get().(*pathfinder)
+	if v.edges.Capacity() < capacity {
+		v.edges = intmap.New(capacity, .95)
+	}
+
+	return v
+}
+
+// release releases a pathfinding state back to the pool
+func release(v *pathfinder) {
+	v.edges.Clear()
+	v.frontier.Reset()
+	pathfinders.Put(v)
+}
+
+// -----------------------------------------------------------------------------
+
+// frontier is a priority queue implementation that uses buckets to store
+// elements. Original implementation by Iskander Sharipov (https://github.com/quasilyte/pathing)
+type frontier struct {
+	buckets [64][]uint32
+	mask    uint64
+}
+
+// newFrontier creates a new frontier priority queue
+func newFrontier() *frontier {
+	h := &frontier{}
+	for i := range &h.buckets {
+		h.buckets[i] = make([]uint32, 0, 16)
+	}
 	return h
 }
 
-// Releases a heap instance back to the pool
-func releaseHeap(h *heap32) {
-	heapPool.Put(h)
-}
+func (q *frontier) Reset() {
+	buckets := &q.buckets
 
-// -----------------------------------------------------------------------------
-
-// heapNode represents a ranked node for the heap.
-type heapNode struct {
-	Value uint32 // The value of the ranked node.
-	Rank  uint32 // The rank associated with the ranked node.
-}
-
-type heap32 []heapNode
-
-func newHeap32(capacity int) heap32 {
-	return make(heap32, 0, capacity)
-}
-
-// Reset clears the heap for reuse
-func (h *heap32) Reset() {
-	*h = (*h)[:0]
-}
-
-// Push pushes the element x onto the heap.
-// The complexity is O(log n) where n = h.Len().
-func (h *heap32) Push(v, rank uint32) {
-	*h = append(*h, heapNode{
-		Value: v,
-		Rank:  rank,
-	})
-	h.up(h.Len() - 1)
-}
-
-// Pop removes and returns the minimum element (according to Less) from the heap.
-// The complexity is O(log n) where n = h.Len().
-// Pop is equivalent to Remove(h, 0).
-func (h *heap32) Pop() (uint32, bool) {
-	n := h.Len() - 1
-	if n < 0 {
-		return 0, false
+	// Reslice storage slices back.
+	// To avoid traversing all len(q.buckets),
+	// we have some offset to skip uninteresting (already empty) buckets.
+	// We also stop when mask is 0 meaning all remaining buckets are empty too.
+	// In other words, it would only touch slices between min and max non-empty priorities.
+	mask := q.mask
+	offset := uint(bits.TrailingZeros64(mask))
+	mask >>= offset
+	i := offset
+	for mask != 0 {
+		if i < uint(len(buckets)) {
+			buckets[i] = buckets[i][:0]
+		}
+		mask >>= 1
+		i++
 	}
 
-	h.Swap(0, n)
-	h.down(0, n)
-	return h.pop(), true
+	q.mask = 0
 }
 
-func (h *heap32) pop() uint32 {
-	old := *h
-	n := len(old)
-	no := old[n-1]
-	*h = old[0 : n-1]
-	return no.Value
+func (q *frontier) IsEmpty() bool {
+	return q.mask == 0
 }
 
-func (h *heap32) up(j int) {
-	for {
-		i := (j - 1) / 2 // parent
-		if i == j || !h.Less(j, i) {
-			break
+func (q *frontier) Push(value, priority uint32) {
+	// No bound checks since compiler knows that i will never exceed 64.
+	// We also get a cool truncation of values above 64 to store them
+	// in our biggest bucket.
+	i := priority & 0b111111
+	q.buckets[i] = append(q.buckets[i], value)
+	q.mask |= 1 << i
+}
+
+func (q *frontier) Pop() uint32 {
+	buckets := &q.buckets
+
+	// Using uints here and explicit len check to avoid the
+	// implicitly inserted bound check.
+	i := uint(bits.TrailingZeros64(q.mask))
+	if i < uint(len(buckets)) {
+		e := buckets[i][len(buckets[i])-1]
+		buckets[i] = buckets[i][:len(buckets[i])-1]
+		if len(buckets[i]) == 0 {
+			q.mask &^= 1 << i
 		}
-		h.Swap(i, j)
-		j = i
+		return e
 	}
-}
 
-func (h *heap32) down(i0, n int) bool {
-	i := i0
-	for {
-		j1 := 2*i + 1
-		if j1 >= n || j1 < 0 { // j1 < 0 after int overflow
-			break
-		}
-		j := j1 // left child
-		if j2 := j1 + 1; j2 < n && h.Less(j2, j1) {
-			j = j2 // = 2*i + 2  // right child
-		}
-		if !h.Less(j, i) {
-			break
-		}
-		h.Swap(i, j)
-		i = j
-	}
-	return i > i0
-}
-
-func (h heap32) Len() int {
-	return len(h)
-}
-
-func (h heap32) IsEmpty() bool {
-	return len(h) == 0
-}
-
-func (h heap32) Less(i, j int) bool {
-	return h[i].Rank < h[j].Rank
-}
-
-func (h *heap32) Swap(i, j int) {
-	(*h)[i], (*h)[j] = (*h)[j], (*h)[i]
+	// A queue is empty
+	return 0
 }

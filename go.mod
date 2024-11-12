@@ -3,6 +3,7 @@ module github.com/kelindar/tile
 go 1.23
 
 require (
+	github.com/kelindar/intmap v1.4.1
 	github.com/kelindar/iostream v1.4.0
 	github.com/stretchr/testify v1.9.0
 )

@@ -269,3 +269,35 @@ func (v Direction) String() string {
 func (v Direction) Vector(scale int16) Point {
 	return Point{}.MoveBy(v, scale)
 }
+
+// angleOf returns the direction from one point to another
+func angleOf(from, to Point) Direction {
+	dx := to.X - from.X
+	dy := to.Y - from.Y
+
+	switch {
+	case dx == 0 && dy == -1:
+		return North
+	case dx == 1 && dy == -1:
+		return NorthEast
+	case dx == 1 && dy == 0:
+		return East
+	case dx == 1 && dy == 1:
+		return SouthEast
+	case dx == 0 && dy == 1:
+		return South
+	case dx == -1 && dy == 1:
+		return SouthWest
+	case dx == -1 && dy == 0:
+		return West
+	case dx == -1 && dy == -1:
+		return NorthWest
+	default:
+		return Direction(0) // Invalid direction
+	}
+}
+
+// oppositeDirection returns the opposite of the given direction
+func oppositeDirection(dir Direction) Direction {
+	return Direction((dir + 4) % 8)
+}
