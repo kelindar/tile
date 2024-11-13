@@ -191,32 +191,36 @@ func (p *pubsub[T]) Unsubscribe(page Point, sub Observer[T]) bool {
 }
 
 // Notify notifies listeners of an update that happened.
-func (p *pubsub[T]) Notify1(ev *Update[T], page, at Point) {
+func (p *pubsub[T]) Notify1(ev *Update[T], page Point) {
 	p.Each1(func(sub Observer[T]) {
-		sub.onUpdate(ev)
-	}, page, at)
+		viewport := sub.Viewport()
+		if viewport.Contains(ev.New.Point) || viewport.Contains(ev.Old.Point) {
+			sub.onUpdate(ev)
+		}
+	}, page)
 }
 
 // Notify notifies listeners of an update that happened.
-func (p *pubsub[T]) Notify2(ev *Update[T], pages, locs [2]Point) {
+func (p *pubsub[T]) Notify2(ev *Update[T], pages [2]Point) {
 	p.Each2(func(sub Observer[T]) {
-		sub.onUpdate(ev)
-	}, pages, locs)
+		viewport := sub.Viewport()
+		if viewport.Contains(ev.New.Point) || viewport.Contains(ev.Old.Point) {
+			sub.onUpdate(ev)
+		}
+	}, pages)
 }
 
 // Each iterates over each observer in a page
-func (p *pubsub[T]) Each1(fn func(sub Observer[T]), page, at Point) {
+func (p *pubsub[T]) Each1(fn func(sub Observer[T]), page Point) {
 	if v, ok := p.m.Load(page.Integer()); ok {
 		v.(*observers[T]).Each(func(sub Observer[T]) {
-			if sub.Viewport().Contains(at) {
-				fn(sub)
-			}
+			fn(sub)
 		})
 	}
 }
 
 // Each2 iterates over each observer in a page
-func (p *pubsub[T]) Each2(fn func(sub Observer[T]), pages, locs [2]Point) {
+func (p *pubsub[T]) Each2(fn func(sub Observer[T]), pages [2]Point) {
 	targets := p.tmp.Get().(map[Observer[T]]struct{})
 	clear(targets)
 	defer p.tmp.Put(targets)
@@ -232,9 +236,7 @@ func (p *pubsub[T]) Each2(fn func(sub Observer[T]), pages, locs [2]Point) {
 
 	// Invoke the callback for each observer, once
 	for sub := range targets {
-		if sub.Viewport().Contains(locs[0]) || sub.Viewport().Contains(locs[1]) {
-			fn(sub)
-		}
+		fn(sub)
 	}
 }
 

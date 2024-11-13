@@ -264,7 +264,7 @@ func (p *page[T]) writeTile(grid *Grid[T], idx uint8, after Value) {
 				Point: at,
 				Value: after,
 			},
-		}, p.point, at)
+		}, p.point)
 	}
 }
 
@@ -291,7 +291,7 @@ func (p *page[T]) mergeTile(grid *Grid[T], idx uint8, fn func(Value) Value) Valu
 				Point: at,
 				Value: after,
 			},
-		}, p.point, at)
+		}, p.point)
 	}
 
 	// Return the merged tile data
@@ -372,9 +372,15 @@ func (t Tile[T]) Range(fn func(T) error) error {
 
 // Observers iterates over all views observing this tile
 func (t Tile[T]) Observers(fn func(view Observer[T])) {
-	if t.data.IsObserved() {
-		t.grid.observers.Each1(fn, t.data.point, t.Point())
+	if !t.data.IsObserved() {
+		return
 	}
+
+	t.grid.observers.Each1(func(sub Observer[T]) {
+		if sub.Viewport().Contains(t.Point()) {
+			fn(sub)
+		}
+	}, t.data.point)
 }
 
 // Add adds object to the set
@@ -394,7 +400,7 @@ func (t Tile[T]) Add(v T) {
 				Value: value,
 			},
 			Add: v,
-		}, t.data.point, at)
+		}, t.data.point)
 	}
 }
 
@@ -415,7 +421,7 @@ func (t Tile[T]) Del(v T) {
 				Value: value,
 			},
 			Del: v,
-		}, t.data.point, at)
+		}, t.data.point)
 	}
 }
 
@@ -449,16 +455,13 @@ func (t Tile[T]) Move(v T, dst Point) bool {
 
 	switch {
 	case t.data == d.data || !d.data.IsObserved():
-		t.grid.observers.Notify1(update, t.data.point, t.Point())
+		t.grid.observers.Notify1(update, t.data.point)
 	case !t.data.IsObserved():
-		t.grid.observers.Notify1(update, d.data.point, d.Point())
+		t.grid.observers.Notify1(update, d.data.point)
 	default:
 		t.grid.observers.Notify2(update, [2]Point{
 			t.data.point,
 			d.data.point,
-		}, [2]Point{
-			t.Point(),
-			d.Point(),
 		})
 	}
 	return true
