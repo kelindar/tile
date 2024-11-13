@@ -17,7 +17,7 @@ BenchmarkView/move-24          	   16141	     74408 ns/op	       0 B/op	       0
 */
 func BenchmarkView(b *testing.B) {
 	m := mapFrom("300x300.png")
-	v := NewView[string, string](m, "view 1")
+	v := NewView(m, "view 1")
 	v.Resize(NewRect(100, 0, 200, 100), nil)
 
 	go func() {
@@ -98,38 +98,6 @@ func TestView(t *testing.T) {
 	v.WriteAt(5, 5, Value(66))
 	assert.Equal(t, 0, len(v.Inbox))
 }
-
-/*
-func TestObservers(t *testing.T) {
-	ev := newObservers[uint32]()
-	assert.NotNil(t, ev)
-
-	// Subscriber which does nothing
-	var sub1 fakeView[uint32] = func(e *Update[uint32]) {}
-	ev.Subscribe(&sub1)
-
-	// Counting subscriber
-	var count int
-	var sub2 fakeView[uint32] = func(e *Update[uint32]) {
-		count += int(e.X)
-	}
-	ev.Subscribe(&sub2)
-
-	ev.Notify(&Update[uint32]{Point: At(1, 0)})
-	ev.Notify(&Update[uint32]{Point: At(2, 0)})
-	ev.Notify(&Update[uint32]{Point: At(3, 0)})
-
-	for count < 6 {
-		time.Sleep(1 * time.Millisecond)
-	}
-
-	assert.Equal(t, 6, count)
-	ev.Unsubscribe(&sub2)
-
-	ev.Notify(&Update[uint32]{Point: At(2, 0)})
-	assert.Equal(t, 6, count)
-}
-*/
 
 func TestUpdates_Simple(t *testing.T) {
 	m := mapFrom("300x300.png")
@@ -314,6 +282,42 @@ func TestView_MoveTo(t *testing.T) {
 
 	// Count the number of observers, should be the same as before
 	assert.Equal(t, 9, countObservers(m))
+	assert.NoError(t, v.Close())
+}
+
+func TestView_Updates(t *testing.T) {
+	m := mapFrom("300x300.png")
+	v := NewView(m, "view 1")
+	v.Resize(NewRect(10, 10, 15, 15), nil)
+
+	move := func(x1, y1, x2, y2 int16) {
+		at, _ := m.At(x1, y1)
+		at.Move("A", At(x2, y2))
+
+		assert.Equal(t, Update[string]{
+			Old: ValueAt{Point: At(x1, y1)},
+			New: ValueAt{Point: At(x2, y2)},
+			Del: "A", Add: "A",
+		}, <-v.Inbox)
+	}
+
+	move(9, 12, 10, 12)  // Enter from left edge
+	move(10, 12, 9, 12)  // Exit to left edge
+	move(15, 12, 14, 12) // Enter from right edge
+	move(14, 12, 15, 12) // Exit to right edge
+	move(12, 9, 12, 10)  // Enter from top edge
+	move(12, 10, 12, 9)  // Exit to top edge
+	move(12, 15, 12, 14) // Enter from bottom edge
+	move(12, 14, 12, 15) // Exit to bottom edge
+	move(9, 9, 10, 10)   // Enter from top-left diagonal
+	move(10, 10, 9, 9)   // Exit to top-left diagonal
+	move(15, 9, 14, 10)  // Enter from top-right diagonal
+	move(14, 10, 15, 9)  // Exit to top-right diagonal
+	move(9, 15, 10, 14)  // Enter from bottom-left diagonal
+	move(10, 14, 9, 15)  // Exit to bottom-left diagonal
+	move(15, 15, 14, 14) // Enter from bottom-right diagonal
+	move(14, 14, 15, 15) // Exit to bottom-right diagonal
+
 	assert.NoError(t, v.Close())
 }
 
