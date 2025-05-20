@@ -55,13 +55,13 @@ func TestDraw(t *testing.T) {
 }
 
 /*
-BenchmarkPath/9x9-24         	 2704395	       440.4 ns/op	     256 B/op	       1 allocs/op
-BenchmarkPath/300x300-24     	    1134	   1033808 ns/op	    3845 B/op	       4 allocs/op
-BenchmarkPath/381x381-24     	    2782	    377676 ns/op	    7298 B/op	       5 allocs/op
-BenchmarkPath/384x384-24     	    2716	    382663 ns/op	    7298 B/op	       5 allocs/op
-BenchmarkPath/3069x3069-24   	     847	   1368243 ns/op	  100140 B/op	       7 allocs/op
-BenchmarkPath/3072x3072-24   	     849	   1368387 ns/op	   99954 B/op	       7 allocs/op
-BenchmarkPath/6144x6144-24   	    3050	    387195 ns/op	   12802 B/op	       5 allocs/op
+BenchmarkPath/9x9-24         	 2856020	       423.0 ns/op	     256 B/op	       1 allocs/op
+BenchmarkPath/300x300-24     	    1167	   1006143 ns/op	    3845 B/op	       4 allocs/op
+BenchmarkPath/381x381-24     	    3150	    371478 ns/op	   12629 B/op	       5 allocs/op
+BenchmarkPath/384x384-24     	    3178	    374982 ns/op	    7298 B/op	       5 allocs/op
+BenchmarkPath/3069x3069-24   	     787	   1459683 ns/op	  106188 B/op	       7 allocs/op
+BenchmarkPath/3072x3072-24   	     799	   1552230 ns/op	  104906 B/op	       7 allocs/op
+BenchmarkPath/6144x6144-24   	    3099	    381935 ns/op	   12716 B/op	       5 allocs/op
 */
 func BenchmarkPath(b *testing.B) {
 	b.Run("9x9", func(b *testing.B) {
