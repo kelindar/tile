@@ -159,7 +159,7 @@ type pathfinder struct {
 var pathfinders = sync.Pool{
 	New: func() any {
 		return &pathfinder{
-			edges:    intmap.New(32, .95),
+			edges:    intmap.NewWithFill(32, .99),
 			frontier: newFrontier(),
 		}
 	},
@@ -169,7 +169,7 @@ var pathfinders = sync.Pool{
 func acquire(capacity int) *pathfinder {
 	v := pathfinders.Get().(*pathfinder)
 	if v.edges.Capacity() < capacity {
-		v.edges = intmap.New(capacity, .95)
+		v.edges = intmap.NewWithFill(capacity, .99)
 	}
 
 	return v
