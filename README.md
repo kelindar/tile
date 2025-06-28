@@ -1,7 +1,7 @@
 # Tile: Data-Oriented 2D Grid Engine
 
 <p align="center">
-    <img width="340" height="152" src="./fixtures/logo.png">
+    <img width="200" height="100" src="./.github/logo.png">
     <br>
     <img src="https://img.shields.io/github/go-mod/go-version/kelindar/tile" alt="Go Version">
     <a href="https://pkg.go.dev/github.com/kelindar/tile"><img src="https://pkg.go.dev/badge/github.com/kelindar/tile" alt="PkgGoDev"></a>
