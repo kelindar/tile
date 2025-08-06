@@ -370,6 +370,11 @@ func (t Tile[T]) Range(fn func(T) error) error {
 	return nil
 }
 
+// IsObserved returns whether the tile is observed or not
+func (t Tile[T]) IsObserved() bool {
+	return t.data.IsObserved()
+}
+
 // Observers iterates over all views observing this tile
 func (t Tile[T]) Observers(fn func(view Observer[T])) {
 	if !t.data.IsObserved() {

@@ -52,7 +52,7 @@ func TestView(t *testing.T) {
 
 	// Create a new view
 	c := counter(0)
-	v := NewView[string, string](m, "view 1")
+	v := NewView(m, "view 1")
 	v.Resize(NewRect(100, 0, 200, 100), c.count)
 	assert.NotNil(t, v)
 	assert.Equal(t, 10000, int(c))
@@ -338,7 +338,7 @@ func countObserversAt(m *Grid[string], x, y int16) (count int) {
 func countObservers(m *Grid[string]) int {
 	var observers int
 	m.Each(func(p Point, t Tile[string]) {
-		if t.data.IsObserved() {
+		if t.IsObserved() {
 			observers++
 		}
 	})
