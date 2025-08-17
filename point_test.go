@@ -73,6 +73,67 @@ func TestDirection_Empty(t *testing.T) {
 	assert.Empty(t, dir.String())
 }
 
+func TestPointAngle(t *testing.T) {
+	tests := []struct {
+		name     string
+		from     Point
+		to       Point
+		expected Direction
+	}{
+		// Cardinal directions from origin
+		{"North", At(0, 0), At(0, -1), North},
+		{"East", At(0, 0), At(1, 0), East},
+		{"South", At(0, 0), At(0, 1), South},
+		{"West", At(0, 0), At(-1, 0), West},
+
+		// Diagonal directions from origin
+		{"NorthEast", At(0, 0), At(1, -1), NorthEast},
+		{"SouthEast", At(0, 0), At(1, 1), SouthEast},
+		{"SouthWest", At(0, 0), At(-1, 1), SouthWest},
+		{"NorthWest", At(0, 0), At(-1, -1), NorthWest},
+
+		// Same point (math.Atan2(0,0) = 0, which maps to East after transformation)
+		{"Same point", At(5, 5), At(5, 5), East},
+
+		// Non-origin starting points
+		{"From 10,10 North", At(10, 10), At(10, 5), North},
+		{"From 10,10 East", At(10, 10), At(15, 10), East},
+		{"From 10,10 South", At(10, 10), At(10, 15), South},
+		{"From 10,10 West", At(10, 10), At(5, 10), West},
+		{"From 10,10 NorthEast", At(10, 10), At(15, 5), NorthEast},
+		{"From 10,10 SouthEast", At(10, 10), At(15, 15), SouthEast},
+		{"From 10,10 SouthWest", At(10, 10), At(5, 15), SouthWest},
+		{"From 10,10 NorthWest", At(10, 10), At(5, 5), NorthWest},
+
+		// Edge cases with larger distances
+		{"Far North", At(0, 0), At(0, -100), North},
+		{"Far East", At(0, 0), At(100, 0), East},
+		{"Far South", At(0, 0), At(0, 100), South},
+		{"Far West", At(0, 0), At(-100, 0), West},
+
+		// Angles close to boundaries (testing rounding)
+		{"Near North boundary", At(0, 0), At(1, -10), North},
+		{"Near NorthEast boundary", At(0, 0), At(10, -10), NorthEast},
+		{"Near East boundary", At(0, 0), At(10, -1), East},
+		{"Near SouthEast boundary", At(0, 0), At(10, 10), SouthEast},
+
+		// Negative coordinates
+		{"Negative coords North", At(-5, -5), At(-5, -10), North},
+		{"Negative coords East", At(-5, -5), At(0, -5), East},
+		{"Negative coords South", At(-5, -5), At(-5, 0), South},
+		{"Negative coords West", At(-5, -5), At(-10, -5), West},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.from.Angle(tc.to)
+			assert.Equal(t, tc.expected, result,
+				"Point %s to %s should be %s, got %s",
+				tc.from.String(), tc.to.String(), tc.expected.String(), result.String())
+		})
+	}
+}
+
 func TestMove(t *testing.T) {
 	tests := []struct {
 		dir Direction

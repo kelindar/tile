@@ -1,11 +1,11 @@
 module github.com/kelindar/tile
 
-go 1.24
+go 1.25
 
 require (
 	github.com/kelindar/intmap v1.5.0
 	github.com/kelindar/iostream v1.4.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (

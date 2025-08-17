@@ -5,9 +5,8 @@ package tile
 
 import (
 	"fmt"
+	"math"
 )
-
-const invalid = int16(-1 << 15)
 
 // -----------------------------------------------------------------------------
 
@@ -119,6 +118,22 @@ func (p Point) MoveBy(direction Direction, n int16) Point {
 // DistanceTo calculates manhattan distance to the other point
 func (p Point) DistanceTo(other Point) uint32 {
 	return abs(int32(p.X)-int32(other.X)) + abs(int32(p.Y)-int32(other.Y))
+}
+
+// Angle calculates the angle between two points
+func (p Point) Angle(other Point) Direction {
+	dx := float64(other.X - p.X)
+	dy := float64(other.Y - p.Y)
+
+	// Calculate the angle in radians
+	angle := math.Atan2(dy, dx)
+	alpha := angle + math.Pi/2
+	if alpha < 0 {
+		alpha += 2 * math.Pi
+	}
+
+	// Map to 8 directions (0-7)
+	return Direction(math.Round(alpha/(math.Pi/4))) % 8
 }
 
 func abs(n int32) uint32 {
